@@ -1,0 +1,450 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hold On</title>
+<style>
+/* Same bones as Twenty-One Pages: serif log, mono HUD, a receipt at the end.
+   Palette is the sea floor in a field guide: silt paper, a crinoid-rose
+   accent (living sea lilies run purple-red), and a deep-water teal. */
+:root{
+  --paper:#eeece4;      --paper-2:#e2dfd3;   --ink:#1f2322;
+  --ink-2:#5c6360;      --rule:#c3c2b4;      --accent:#8a3b52;
+  --accent-2:#2c5c63;   --good:#46653d;      --bad:#8c3b32;
+  --hud:#e6e3d8;        --crin:#9a4a63;      --stalk:#8b8374;
+  --serif:"Iowan Old Style","Palatino Linotype",Palatino,"Book Antiqua",Georgia,serif;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,"DejaVu Sans Mono",monospace;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --paper:#121716;    --paper-2:#1a2120;   --ink:#dde2dc;
+    --ink-2:#8f9a95;    --rule:#2f3a38;      --accent:#d98aa2;
+    --accent-2:#77b3b8; --good:#8fae82;      --bad:#d1776c;
+    --hud:#0e1312;      --crin:#c77892;      --stalk:#8a8576;
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#121716;    --paper-2:#1a2120;   --ink:#dde2dc;
+  --ink-2:#8f9a95;    --rule:#2f3a38;      --accent:#d98aa2;
+  --accent-2:#77b3b8; --good:#8fae82;      --bad:#d1776c;
+  --hud:#0e1312;      --crin:#c77892;      --stalk:#8a8576;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{background:var(--paper);color:var(--ink);font-family:var(--serif);
+  font-size:17px;line-height:1.62;-webkit-text-size-adjust:100%}
+.wrap{max-width:680px;margin:0 auto;padding:0 16px 96px}
+
+#hud{position:sticky;top:0;z-index:20;background:var(--hud);
+  border-bottom:1px solid var(--rule);font-family:var(--mono);font-size:11px;
+  color:var(--ink-2);padding:8px 0 7px;margin-bottom:22px;font-variant-numeric:tabular-nums}
+#hud .in{max-width:680px;margin:0 auto;padding:0 16px;display:flex;flex-wrap:wrap;
+  gap:4px 16px;align-items:baseline}
+#hud b{font-weight:400;color:var(--ink);letter-spacing:.06em}
+#hud .era{color:var(--accent);font-weight:700;letter-spacing:.1em}
+#hud .lo{color:var(--bad)}
+#hud .r{margin-left:auto;color:var(--accent-2)}
+
+#fig{display:block;margin:0 auto 10px;width:150px;height:190px}
+#log > *{animation:fade .28s ease-out}
+@keyframes fade{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){#log > *{animation:none}}
+.beat{margin:0 0 1.05em}
+.head{font-family:var(--mono);font-size:11.5px;letter-spacing:.19em;color:var(--accent);
+  text-transform:uppercase;margin:2.2em 0 .35em;padding-top:1.1em;border-top:1px solid var(--rule)}
+#log > .head:first-child{margin-top:0;padding-top:0;border-top:0}
+.evt{background:var(--paper-2);border-left:3px solid var(--accent);padding:.7em .9em;margin:0 0 1.05em}
+.stat{font-family:var(--mono);font-size:11.5px;color:var(--ink-2);margin:0 0 1.05em}
+.stat .up{color:var(--good)} .stat .dn{color:var(--bad)}
+
+#choices{margin-top:1.6em;border-top:1px solid var(--rule);padding-top:.4em}
+.choice{display:block;width:100%;text-align:left;background:none;cursor:pointer;border:0;
+  border-bottom:1px solid var(--rule);color:inherit;font-family:inherit;font-size:16.5px;
+  padding:.72em 0 .72em 20px;position:relative;line-height:1.45}
+.choice:hover,.choice:focus-visible{background:var(--paper-2);outline:none}
+.choice:hover .lbl,.choice:focus-visible .lbl{color:var(--accent)}
+.choice::before{content:"\203A";position:absolute;left:4px;top:.66em;color:var(--rule)}
+.choice .lbl{font-variant:small-caps;letter-spacing:.045em}
+.choice .gloss{display:block;font-family:var(--mono);font-size:11px;color:var(--ink-2);margin-top:.15em;line-height:1.5}
+.choice.warn .gloss{color:var(--bad)}
+
+#title{padding:9vh 0 0;text-align:center}
+#title h1{font-family:var(--mono);font-size:clamp(26px,7vw,42px);font-weight:400;letter-spacing:.24em;margin:0 0 .15em}
+#title .sub{font-size:15px;color:var(--ink-2);margin:0 0 2em;font-style:italic}
+#title .blurb{text-align:left;margin:0 auto 2.2em;max-width:480px;color:var(--ink-2);font-size:16px}
+#title .blurb b{color:var(--ink)}
+#title .choice{max-width:480px;margin:0 auto}
+#title #choices-t{max-width:480px;margin:0 auto;border-top:1px solid var(--rule)}
+
+#gallery{margin:3.2em auto 0;max-width:480px;text-align:left}
+#gallery h2{font-family:var(--mono);font-size:11px;letter-spacing:.2em;color:var(--ink-2);
+  text-transform:uppercase;font-weight:400;border-bottom:1px solid var(--rule);padding-bottom:.5em;margin:0 0 .9em}
+.eg{font-family:var(--mono);font-size:12px;line-height:1.85;color:var(--ink-2);display:flex;gap:10px}
+.eg .n{color:var(--rule);min-width:2.1em}
+.eg.got .t{color:var(--accent);font-weight:700}
+.wipe{margin-top:1.2em;font-family:var(--mono);font-size:10.5px;color:var(--ink-2);opacity:.6;
+  background:none;border:0;cursor:pointer;letter-spacing:.1em}
+.wipe:hover{color:var(--bad);opacity:1}
+
+.ending{margin-top:2.4em;border-top:2px solid var(--accent);padding-top:1.5em}
+.ending .cap{font-family:var(--mono);font-size:10.5px;letter-spacing:.2em;text-transform:uppercase;color:var(--ink-2)}
+.ending h2{font-family:var(--mono);font-size:clamp(18px,4.4vw,25px);font-weight:400;letter-spacing:.12em;margin:.2em 0 .8em;color:var(--accent)}
+.ending p{margin:0 0 1em}
+.ending em{color:var(--ink-2)}
+.receipt{font-family:var(--mono);font-size:11.5px;color:var(--ink-2);background:var(--paper-2);
+  padding:1em 1.1em;margin:1.6em 0 0;line-height:1.9;font-variant-numeric:tabular-nums}
+.receipt .r{display:flex;justify-content:space-between;gap:12px;border-bottom:1px dotted var(--rule)}
+.receipt .r:last-child{border-bottom:0}
+.receipt .r b{font-weight:700;color:var(--ink)}
+.newend{color:var(--good);font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;margin:1.2em 0 0}
+footer{margin-top:4em;padding-top:1.2em;border-top:1px solid var(--rule);font-family:var(--mono);
+  font-size:10.5px;color:var(--ink-2);line-height:1.8}
+.hidden{display:none !important}
+@media(max-width:520px){body{font-size:16px} #hud .in{font-size:10px;gap:3px 11px} #hud .r{margin-left:0}}
+</style>
+</head>
+<body>
+<div id="hud" class="hidden"><div class="in"></div></div>
+<div class="wrap">
+  <section id="title">
+    <h1>HOLD ON</h1>
+    <p class="sub">the life of a crinoid, in ten seasons or fewer</p>
+    <div class="blurb">
+      <p>You are a <b>crinoid</b>. The name means <i>lily-shaped</i>. You are not a lily.
+      You are an animal, a cousin of the starfish, built out of a few thousand small
+      plates of calcite, each one a single crystal.</p>
+      <p>Your family has been doing this since the Ordovician. The job has not changed.
+      You hold on to something. You open your arms. You wait for the sea to bring dinner.</p>
+      <p>First, choose when to be born.</p>
+    </div>
+    <div id="choices-t"></div>
+    <div id="gallery"></div>
+  </section>
+  <section id="game" class="hidden">
+    <svg id="fig" viewBox="0 0 150 190" aria-hidden="true"></svg>
+    <div id="log"></div>
+    <div id="choices"></div>
+  </section>
+  <footer>Facts are real; the crinoid is composite. Sources: the usual echinoderm literature —
+  Baumiller &amp; Messing on crawling and cidaroid predation, the platyceratid snail record,
+  Crawfordsville and the Burlington Limestone, Lindisfarne folklore, and the Missouri
+  state statutes. Some crinoid behaviour is compressed for play; no crinoid gets to choose its geological period.</footer>
+</div>
+<script>
+"use strict";
+const $=s=>document.querySelector(s);
+const pick=a=>a[Math.floor(Math.random()*a.length)];
+const chance=p=>Math.random()<p;
+
+const ENDINGS=[
+ ["drift","NEVER SETTLED"],["sand","WRONG FLOOR"],["starved","SAFE THE WHOLE TIME"],
+ ["cup","A CUP ON A STICK"],["eaten","DATA POINT"],["feather","FEATHER STAR"],
+ ["landlord","LANDLORD"],["apart","A FEW THOUSAND PIECES"],["drawer","THE DRAWER"],
+ ["limestone","THE LOBBY FLOOR"],["beads","ST CUTHBERT'S BEADS"]];
+const KEY="crinoid-endings-v1";
+function got(){try{return JSON.parse(localStorage.getItem(KEY)||"[]")}catch(e){return []}}
+function save(id){const g=got();if(g.includes(id))return false;g.push(id);
+  try{localStorage.setItem(KEY,JSON.stringify(g))}catch(e){}return true}
+
+let S;
+const MAX_SEASON=10;
+
+/* ------------------------------------------------------------ the figure */
+function drawFig(){
+  const f=$("#fig"); if(!S){f.innerHTML="";return}
+  let h="";
+  const gy=182;
+  h+=`<line x1="4" y1="${gy}" x2="146" y2="${gy}" stroke="var(--rule)" stroke-width="1"/>`;
+  if(S.phase==="larva"){
+    const y=60+S.day*28;
+    h+=`<ellipse cx="75" cy="${y}" rx="9" ry="13" fill="none" stroke="var(--crin)" stroke-width="1.4"/>`;
+    for(let i=-2;i<=2;i++) h+=`<line x1="66" y1="${y+i*5}" x2="84" y2="${y+i*5}" stroke="var(--crin)" stroke-width=".7" opacity=".6"/>`;
+    f.innerHTML=h; return;
+  }
+  if(S.phase==="gone"){f.innerHTML=h;return}
+  const sh=Math.min(120,24+S.stalk*1.6), top=gy-sh;
+  h+=`<line x1="75" y1="${gy}" x2="75" y2="${top}" stroke="var(--stalk)" stroke-width="3"/>`;
+  for(let y=gy-4;y>top+2;y-=4) h+=`<line x1="72.5" y1="${y}" x2="77.5" y2="${y}" stroke="var(--paper)" stroke-width=".8"/>`;
+  if(!S.feather) h+=`<path d="M68 ${gy} q7 -6 14 0" fill="none" stroke="var(--stalk)" stroke-width="2"/>`;
+  h+=`<path d="M68 ${top} L82 ${top} L79 ${top+8} L71 ${top+8} Z" fill="var(--crin)"/>`;
+  const n=S.arms, open=S.open;
+  for(let i=0;i<n;i++){
+    const t=n===1?0:i/(n-1)-.5;
+    const a=(open?t*150:t*26)*Math.PI/180, L=open?52:44;
+    const x0=75+t*10, y0=top;
+    const x1=x0+Math.sin(a)*L*.55, y1=y0-Math.cos(a)*L*.55;
+    const x2=x0+Math.sin(a*(open?1.15:.3))*L, y2=y0-Math.cos(a*(open?1.15:.3))*L+(open?0:6);
+    h+=`<path d="M${x0} ${y0} Q${x1} ${y1} ${x2} ${y2}" fill="none" stroke="var(--crin)" stroke-width="1.5" stroke-linecap="round"/>`;
+    if(open) for(let k=1;k<5;k++){const u=k/5,px=(1-u)*(1-u)*x0+2*u*(1-u)*x1+u*u*x2,py=(1-u)*(1-u)*y0+2*u*(1-u)*y1+u*u*y2;
+      h+=`<line x1="${px-2.5}" y1="${py-1.5}" x2="${px+2.5}" y2="${py+1.5}" stroke="var(--crin)" stroke-width=".6" opacity=".7"/>`}
+  }
+  if(S.snail) h+=`<path d="M81 ${top+2} a4 4 0 1 1 5 4 a2 2 0 1 1 -2 -2" fill="none" stroke="var(--accent-2)" stroke-width="1.3"/>`;
+  S.tenants.forEach((_,i)=>{h+=`<circle cx="${62+i*9}" cy="${top-6-(i%2)*5}" r="2" fill="var(--accent-2)"/>`});
+  f.innerHTML=h;
+}
+
+/* ----------------------------------------------------------------- hud */
+function hud(){
+  const el=$("#hud");
+  if(!S||S.phase==="gone"){el.classList.add("hidden");return}
+  el.classList.remove("hidden");
+  const bar=(v,m)=>"▮".repeat(Math.max(0,v))+"▯".repeat(Math.max(0,m-v));
+  let x=`<span class="era">${S.era==="carb"?"CARBONIFEROUS":"PRESENT DAY"}</span>`;
+  if(S.phase==="larva") x+=`<span>DAY <b>${S.day}</b>/3</span><span>YOLK <b class="${S.day>=3?"lo":""}">${bar(4-S.day,3)}</b></span>`;
+  else{
+    x+=`<span>SEASON <b>${S.season}</b>/${MAX_SEASON}</span>`;
+    x+=`<span>FOOD <b class="${S.food<=2?"lo":""}">${bar(S.food,10)}</b></span>`;
+    x+=`<span>ARMS <b class="${S.arms<=4?"lo":""}">${S.arms}</b></span>`;
+    x+=`<span>STALK <b>${S.stalk}</b> columnals</span>`;
+    if(S.tenants.length||S.snail) x+=`<span>TENANTS <b>${S.tenants.length+(S.snail?1:0)}</b></span>`;
+  }
+  x+=`<span class="r">${got().length}/${ENDINGS.length} endings</span>`;
+  el.firstChild.innerHTML=x;
+}
+
+/* ------------------------------------------------------------- the log */
+function say(html,cls="beat"){const d=document.createElement("div");d.className=cls;d.innerHTML=html;$("#log").appendChild(d);return d}
+function head(t){say(t,"head")}
+function stat(parts){say(parts.filter(Boolean).join(" &nbsp;·&nbsp; "),"stat")}
+function choices(list){
+  const c=$("#choices");c.innerHTML="";
+  list.forEach(o=>{const b=document.createElement("button");b.className="choice"+(o.warn?" warn":"");
+    b.innerHTML=`<span class="lbl">${o.label}</span>${o.gloss?`<span class="gloss">${o.gloss}</span>`:""}`;
+    b.onclick=()=>{c.innerHTML="";o.go();hud();drawFig();
+      const last=$("#log").lastElementChild;
+      const y=(last?last.getBoundingClientRect().top+scrollY:0)-80;
+      if(o.scroll!==false) scrollTo({top:Math.max(0,y),behavior:"smooth"})};
+    c.appendChild(b)});
+}
+
+/* ------------------------------------------------------------ title */
+function title(){
+  S=null;$("#game").classList.add("hidden");$("#title").classList.remove("hidden");hud();
+  const c=$("#choices-t");c.innerHTML="";
+  [["carb","The Carboniferous","340 million years ago. The Age of Crinoids. Everyone you know is a crinoid."],
+   ["now","The present day","Deep water. Most of your relatives have left. There are urchins."]].forEach(([e,l,g])=>{
+    const b=document.createElement("button");b.className="choice";
+    b.innerHTML=`<span class="lbl">${l}</span><span class="gloss">${g}</span>`;b.onclick=()=>begin(e);c.appendChild(b)});
+  const g=got();
+  $("#gallery").innerHTML=`<h2>Endings — ${g.length} of ${ENDINGS.length}</h2>`+
+    ENDINGS.map(([id,t],i)=>`<div class="eg ${g.includes(id)?"got":""}"><span class="n">${String(i+1).padStart(2,"0")}</span><span class="t">${g.includes(id)?t:"· · ·"}</span></div>`).join("")+
+    (g.length?`<button class="wipe" id="wipe">forget every ending</button>`:"");
+  const w=$("#wipe"); if(w) w.onclick=()=>{try{localStorage.removeItem(KEY)}catch(e){}title()};
+}
+
+function begin(era){
+  S={era,phase:"larva",day:1,season:0,food:5,arms:10,stalk:6,tenants:[],snail:false,open:false,
+     feather:false,fed:0,lost:0,regrown:0,crawled:0,closedStreak:0,firstFeed:true};
+  $("#title").classList.add("hidden");$("#game").classList.remove("hidden");$("#log").innerHTML="";
+  scrollTo(0,0);
+  head("Day 1 &nbsp;·&nbsp; the water column");
+  say(`You are a <b>doliolaria</b>: a small barrel ringed with bands of cilia, smaller than a sesame seed. You cannot eat. You have no mouth yet. You were packed a lunch — yolk — and it will last a few days.`);
+  say(`Your only job is to find something hard, and hold on to it for the rest of your life. That is the whole plan. Nobody has ever improved on it.`);
+  larva();hud();drawFig();
+}
+
+/* ------------------------------------------------------------- larva */
+const SUBS={
+  carb:[["rock","a lump of rock. Hard. Unambiguous."],["shell","an empty brachiopod shell, lying the right way up."],
+        ["stem","the stem of a crinoid who got here first. It does not seem to mind."],["sand","a patch of fine sand. It looks like floor."]],
+  now:[["rock","a ledge of rock. Hard. Unambiguous."],["shell","a dead clam shell."],
+       ["stem","an old stalk fragment, somebody's, left behind."],["sand","a patch of fine sand. It looks like floor."]]};
+function larva(){
+  const s=pick(SUBS[S.era]);S.sub=s[0];
+  say(`Below you: ${s[1]}`);
+  choices([
+    {label:"Settle here",gloss:"you only get to do this once",go:()=>settle()},
+    {label:"Keep drifting",gloss:S.day>=3?"the yolk is nearly gone":"there might be somewhere better",warn:S.day>=3,go:()=>{
+      if(S.day>=3) return end("drift");
+      S.day++;head(`Day ${S.day} &nbsp;·&nbsp; still the water column`);
+      say(pick(["You drift. A copepod goes past, very busy. You feel the yolk get smaller.","You drift. The light gets dimmer and then brighter again. That was a night.","You drift. You are carried, as all plans are, somewhere slightly sideways of where you meant."]));
+      larva()}}]);
+}
+function settle(){
+  if(S.sub==="sand") return end("sand");
+  S.phase="sessile";S.season=1;
+  head("Settling");
+  say(`You glue yourself down, stop swimming, and begin to turn into something else. The barrel goes. A stalk comes up, then a cup on top of it, then arms. This takes a while and you do not get a say in any of it.`);
+  if(S.era==="carb") say(`When you can see again, you see crinoids. Thousands of them, in every direction the silt allows, arms open to the current: a meadow of animals pretending to be plants, on a warm shallow sea floor that will one day be Missouri. This is the Mississippian. The textbooks call it the Age of Crinoids. You are, briefly, the most normal thing in the world.`);
+  else say(`When you can see again, it is dark and cold and you are a hundred-odd metres down. There are not many of you. Most living crinoids are feather stars — they drop the stalk when they are young and walk off. The ones that stayed on stalks mostly live deep, and nobody is completely sure why. The leading theory is that things kept eating them.`);
+  season(true);
+}
+
+/* ------------------------------------------------------------- seasons */
+function rollEvent(){
+  if(S.era==="carb"){
+    const r=Math.random();
+    if(r<.44) return "current"; if(r<.66) return "slack"; if(r<.84) return "storm";
+    return S.snail?"current":"tenant";
+  }
+  const r=Math.random();
+  if(r<.42) return "current"; if(r<.58) return "slack"; if(r<.74) return "fish";
+  if(r<.86) return "urchin"; return "tenant";
+}
+const FEED_LINES=[
+  `You spread your arms into a fan across the current. Tube feet flick particles into the grooves along each arm; the grooves carry them, in mucus, down to your mouth. Your mouth is on top. So is your anus, a few millimetres away, on a little chimney. You have made your peace with this. You had four hundred and eighty million years.`,
+  `You open the fan. Diatoms, larvae, fragments of things that died upstream. It all goes down the grooves. You do not choose any of it. You are a very old kind of net.`,
+  `You open the fan. Somewhere up the current a whole reef is having the worst day of its life, and it is delicious.`,
+  `You open the fan and the sea does what the sea does, which is to go past you with things in it.`];
+function season(first){
+  const ev=first?"current":rollEvent(); S.ev=ev; S.open=false;
+  head(`Season ${S.season}`);
+  if(ev==="current"){
+    say(`The current is running. Particles are going past: plankton, detritus, bits of things. This is what you are for.`,"evt");
+    choices([
+      {label:"Open the fan",gloss:S.era==="now"?"eat; something with fins may notice":"eat",go:()=>{
+        S.open=true;let g=Math.ceil(4*S.arms/10)+(S.era==="carb"&&S.stalk>=36?1:0)-(S.snail?1:0);
+        say(S.firstFeed?FEED_LINES[0]:pick(FEED_LINES.slice(1)));S.firstFeed=false;
+        if(S.era==="carb"&&S.stalk>=36) say(`You are taller than most of the meadow now. The water up here is faster and nobody else has touched it.`);
+        if(S.snail) say(`The snail on your anus takes its cut.`);
+        let lost=0;
+        if(S.era==="now"&&chance(.25)){lost=1;S.arms--;S.lost++;say(`A fish takes one of your arms on its way past, like someone taking a chip off your plate. You let it go at a joint that exists for exactly this.`)}
+        S.food=Math.min(10,S.food+g);S.fed++;S.closedStreak=0;
+        stat([`<span class="up">food +${g}</span>`,lost&&`<span class="dn">arms −1</span>`]);next()}},
+      {label:"Stay closed",gloss:"nothing can get you in here",go:()=>{
+        S.closedStreak++;
+        say(S.closedStreak>1?`You stay closed again. The current goes by, full. It will be back. Probably.`:`You keep your arms curled up over the cup. The food goes past. It is very safe in here and there is nothing to eat.`);
+        next()}}]);
+  }
+  else if(ev==="slack"){
+    say(`Slack water. Nothing is moving. Nothing is coming.`,"evt");
+    const c=[{label:"Wait",go:()=>{say(pick([`You wait. You are good at this. You have no brain, only a ring of nerves, and it is not troubled.`,`You wait. A worm crosses the floor below you. Neither of you makes anything of it.`,`You wait. Waiting is most of the job. The job is mostly waiting.`]));next()}}];
+    if(S.arms<10) c.push({label:"Regrow an arm",gloss:"costs 2 food",go:()=>{
+      S.food-=2;S.arms++;S.regrown++;say(`You grow the arm back. Crinoids do this as a matter of routine; a lot of fossil arms show the join where a new one started. It costs you, but it is the same arm, more or less.`);stat([`<span class="dn">food −2</span>`,`<span class="up">arms +1</span>`]);next()}});
+    if(S.era==="carb") c.push({label:"Add to the stalk",gloss:"costs 2 food · taller reaches faster water",go:()=>{
+      S.food-=2;S.stalk+=10;say(`You add ten more columnals to the stalk: ten more discs of calcite, each with a hole through the middle, stacked like coins. The meadow has layers — short crinoids near the mud, tall ones above — and every layer eats different water.`);stat([`<span class="dn">food −2</span>`,`<span class="up">stalk +10</span>`]);next()}});
+    if(S.era==="now") c.push({label:"Let go of the stalk",gloss:"you cannot take this back",warn:true,go:()=>end("feather")});
+    choices(c);
+  }
+  else if(ev==="storm"){
+    say(`A storm is working the surface. Down here the water has gone the colour of soup, and the soup is full of food.`,"evt");
+    choices([
+      {label:"Open up — it's all in the water",gloss:"+4 food · the murk is full of flying debris",go:()=>{
+        S.open=true;S.food=Math.min(10,S.food+4);let l=0;
+        say(`You open into it. It is the best meal of your life, and it is moving at speed.`);
+        if(chance(.5)){l=3;S.arms=Math.max(0,S.arms-3);S.lost+=3;say(`Something hard and fast comes out of the murk and takes three arms clean off. You do not see what. It does not matter.`)}
+        stat([`<span class="up">food +4</span>`,l&&`<span class="dn">arms −3</span>`]);next()}},
+      {label:"Close up and hold on",gloss:"whatever happens, you will be in one piece",go:()=>{
+        S.closedStreak++;
+        if(chance(.35)) return end("drawer");
+        say(`You curl up and hold. The storm passes over. Around you, a few of the tall ones are down.`);next()}}]);
+  }
+  else if(ev==="fish"){
+    say(`A fish has noticed that one of your arms is edible.`,"evt");
+    choices([
+      {label:"Let it have the arm",gloss:"arms −1",go:()=>{S.arms--;S.lost++;say(`You drop it at a joint built for dropping. The fish swims off with it, pleased. You have nine more of these, or had.`);stat([`<span class="dn">arms −1</span>`]);next()}},
+      {label:"Pull it in",gloss:"costs food; may not work",go:()=>{S.food--;
+        if(chance(.5)){say(`You coil the arm down into the others. The fish loses interest. You spent a season's worth of effort not being eaten, which is a thing a lot of animals will recognise.`);stat([`<span class="dn">food −1</span>`])}
+        else{S.arms=Math.max(0,S.arms-3);S.lost+=3;say(`You pull. The fish pulls harder, and gets three.`);stat([`<span class="dn">food −1</span>`,`<span class="dn">arms −3</span>`])}
+        next()}}]);
+  }
+  else if(ev==="urchin"){
+    say(`A cidaroid urchin is coming across the floor toward you, on its spines, at the speed of a slow thought. Cidaroids eat stalked crinoids. They start at the bottom.`,"evt");
+    choices([
+      {label:"Stay where you are",gloss:"it might not be hungry",warn:true,go:()=>{
+        if(chance(.6)) return end("eaten");
+        S.stalk=Math.max(3,S.stalk-4);say(`It reaches you, rasps at the bottom of your stalk for a while, and wanders off. You are shorter than you were.`);stat([`<span class="dn">stalk −4</span>`]);next()}},
+      {label:"Let go and crawl",gloss:"costs 1 food",go:()=>{
+        S.food-=1;S.crawled++;S.stalk=Math.max(3,S.stalk-3);
+        say(`You let go of the sea floor, lie down, and pull yourself away across the mud with your arms, trailing the stalk behind you like a sensible handbag. Stalked crinoids really do this. Almost nobody knows. The urchin does, and you are faster than it.`);
+        say(`You stop a few metres away, raise yourself, and hold on to something new.`);
+        stat([`<span class="dn">food −1</span>`,`<span class="dn">stalk −3</span>`]);next()}}]);
+  }
+  else if(ev==="tenant"){
+    if(S.era==="carb"){
+      say(`A snail has arrived. It is a platyceratid, and it has climbed up your stalk and settled itself directly over your anus, facing in.`,"evt");
+      choices(["Allow it","Object"].map((l,i)=>({label:l,gloss:i?"with what?":"",go:()=>{
+        S.snail=true;
+        say(i?`You object. You have no brain, no voice, and no hands. The snail stays.`:`You allow it. It was not asking.`);
+        say(`Platyceratids lived like this: parked for life on a crinoid's anal vent, eating what came out. They have been found fossilised in place, still on their crinoid. It will be with you until the end. It will cost you a little every meal.`);
+        next()}})));
+    } else {
+      const T=pick([["shrimp","a crinoid shrimp, dressed in your exact colours"],["clingfish","a clingfish the length of a fingernail"],["worm","a myzostomid worm, a flat little parasite that lives on crinoids and nowhere else"],["lobster","a squat lobster, which is neither a lobster nor, really, squat"]]);
+      say(`Someone is moving in: ${T[1]}.`,"evt");
+      choices(["Allow it","Object"].map((l,i)=>({label:l,gloss:i?"with what?":"",go:()=>{
+        S.tenants.push(T[0]);
+        say(i?`You object. You have no brain, no voice, and no hands. It moves in.`:`You allow it. It was not asking.`);
+        next()}})));
+    }
+  }
+}
+function next(){
+  choices([{label:"Next season",go:advance}]);
+}
+function advance(){
+  S.food--;
+  if(S.food<=0) return end("starved");
+  if(S.arms<=3) return end("cup");
+  if(S.season>=MAX_SEASON) return oldAge();
+  S.season++;season(false);
+}
+function oldAge(){
+  head("Old age");
+  say(`You have been open to the current for ${MAX_SEASON} seasons. Your arms are slower. The meadow — or the dark, or whatever you had — goes on without needing you to hold up your end.`);
+  if(S.era==="carb") return end(S.stalk>=36?"beads":"limestone");
+  return end(S.tenants.length>=3?"landlord":"apart");
+}
+
+/* -------------------------------------------------------------- endings */
+function list(a){return a.length<2?a.join(""):a.slice(0,-1).join(", ")+" and "+a[a.length-1]}
+const TEN={shrimp:"a shrimp",clingfish:"a clingfish",worm:"a myzostomid worm",lobster:"a squat lobster"};
+const E={
+ drift:()=>`<p>The yolk runs out on the fourth day. You never found anything you were sure enough about.</p>
+  <p>You go on drifting, smaller than a sesame seed, and then you are simply part of the current — which is to say, part of the food. Somewhere downstream, a crinoid who settled on the first rock it saw opens its fan.</p>
+  <p><em>Every crinoid that ever lived is one that settled. You were the other kind. There were far more of you.</em></p>`,
+ sand:()=>`<p>You glue yourself to a grain of sand. The grain is glued to nothing.</p>
+  <p>The first proper current rolls you over, and over, and a little way off, and over. You spend the rest of your short life as a small stalk with opinions, tumbling.</p>
+  <p><em>A crinoid needs exactly one thing: something that does not move. It is harder to find than it sounds.</em></p>`,
+ starved:()=>`<p>The sea brought dinner ${S.fed?"":"every time "}and you were closed. ${S.fed?`You opened ${S.fed} time${S.fed>1?"s":""} in ${S.season} seasons.`:"You never opened at all."} It was not enough.</p>
+  <p>Nothing bit you. Nothing tore off an arm. You end with every plate in place, which is more than most crinoids can say, and nothing inside them.</p>
+  <p><em>You were safe the whole time. That was the problem.</em></p>`,
+ cup:()=>`<p>You are down to ${["no arms","one arm","two arms","three arms"][Math.max(0,S.arms)]}, and then the next fish comes, and then there is a cup on a stick, open to the current, with nothing to catch it with.</p>
+  <p>Crinoids regrow arms all the time. ${S.regrown?`You regrew ${S.regrown} yourself.`:"You never got round to it."} But regrowing takes food, and food takes arms, and you have run out of the one to pay for the other.</p>
+  <p><em>Technically you are still a crinoid. "Technically" is doing a lot of work.</em></p>`,
+ eaten:()=>`<p>The urchin arrives and starts at the bottom, as promised.</p>
+  <p>Cidaroid urchins have been eating stalked crinoids for a very long time; fossil stalks carry what look like their bite marks going back to the Triassic. The usual defence is to get up and crawl away. You did not.</p>
+  <p><em>This is the leading theory for why your family lives so deep now. You are a data point.</em></p>`,
+ feather:()=>`<p>You let go. It is a clean break, at a joint that was made for it.</p>
+  <p>You grow cirri — small hooked feet — and you walk. When you want to, you swim, beating your arms in alternating sets, half up and half down, like someone badly remembering a dance. You climb a sea fan and open up at the top. Nothing about the food has changed. Everything about the address has.</p>
+  <p>Of the six hundred or so crinoid species alive today, most are feather stars. They all did this.</p>
+  <p><em>The oldest trick in the family is holding on. The most successful one turned out to be letting go.</em></p>`,
+ landlord:()=>`<p>By the end, ${S.tenants.length} other animals live on you: ${list(S.tenants.map(t=>TEN[t]))}. None of them pay. Some of them are the same colour as you, on purpose.</p>
+  <p>Crinoids host shrimp, clingfish, squat lobsters, brittle stars, and myzostomid worms; some of those tenants live nowhere else. When you die they will have to move out, and it will be the most dramatic thing that has ever happened to them.</p>
+  <p><em>You never did anything. You were just there, for long enough, and it became a neighbourhood.</em></p>`,
+ apart:()=>`<p>You die in the ordinary way.</p>
+  <p>Within days, the soft tissue holding your plates together is gone, and you come apart into a few thousand pieces — each one a single crystal of calcite. The current you spent your whole life facing sorts you into the sand.</p>
+  <p><em>Nobody will ever find you. That is how almost everyone goes.</em></p>`,
+ drawer:()=>`<p>The storm drops the sea floor on top of you. A metre of mud in an afternoon. You, the crinoid beside you, and a thousand others are sealed in at once, arms still curled, every plate still where you put it.</p>
+  <p>Three hundred and forty million years later somebody splits a slab of rock in Crawfordsville, Indiana, and there you are, whole. You go into a drawer, in a museum, with a label. Missouri made the crinoid its state fossil in 1989. You were not consulted.</p>
+  <p><em>Almost every perfect fossil is a disaster that happened fast. The sea only keeps what it buries in a hurry.</em></p>`,
+ limestone:()=>`<p>You die in the ordinary way. Within days you come apart into a few thousand plates, and the plates settle among the plates of everyone else who ever lived in the meadow.</p>
+  <p>Pile up enough of that and it gets a name: crinoidal limestone. The Burlington Limestone, across Missouri, Iowa and Illinois, is largely made of crinoids like you. Some of it gets cut, polished, and laid in the lobby of a building, where people stand in line on top of you and look at their phones.</p>
+  ${S.snail?"<p>The snail is in there too. It stayed to the end. It never once looked up.</p>":""}
+  <p><em>You were never going to be a fossil. You were going to be the floor.</em></p>`,
+ beads:()=>`<p>You were tall: ${S.stalk} columnals, each a small disc of calcite with a hole through the middle. When you come apart, they scatter.</p>
+  <p>Some end up in the Carboniferous limestone of Northumberland, and wash out onto the beach on Lindisfarne, where people have picked them up for centuries and threaded them into rosaries. They call them St Cuthbert's beads. The story goes that on stormy nights the saint sits on a rock by the shore and forges them, using another rock as an anvil.</p>
+  <p><em>You spent your whole life reaching higher for food. Monks spent theirs counting you.</em></p>`
+};
+function end(id){
+  S.open=false; if(id==="feather"){S.feather=true}
+  const isNew=save(id);const t=ENDINGS.find(e=>e[0]===id)[1];
+  if(["drift","sand"].includes(id)) S.phase="gone";
+  const d=say(`<div class="cap">Ending ${ENDINGS.findIndex(e=>e[0]===id)+1} of ${ENDINGS.length}</div><h2>${t}</h2>${E[id]()}`+
+    (S.phase==="larva"||S.phase==="gone"?"":`<div class="receipt">
+      <div class="r"><span>Era</span><b>${S.era==="carb"?"Carboniferous":"Present day"}</b></div>
+      <div class="r"><span>Seasons</span><b>${S.season}</b></div>
+      <div class="r"><span>Times you opened</span><b>${S.fed}</b></div>
+      <div class="r"><span>Arms lost / regrown</span><b>${S.lost} / ${S.regrown}</b></div>
+      <div class="r"><span>Stalk</span><b>${S.stalk} columnals</b></div>
+      ${S.crawled?`<div class="r"><span>Times you walked away</span><b>${S.crawled}</b></div>`:""}
+      <div class="r"><span>Tenants</span><b>${S.tenants.length+(S.snail?1:0)}</b></div></div>`)+
+    (isNew?`<div class="newend">new ending · ${got().length} of ${ENDINGS.length} found</div>`:""),"ending");
+  hud();drawFig();
+  choices([{label:"Be born again",gloss:"crinoids have been doing this for 480 million years",go:title,scroll:false}]);
+  setTimeout(()=>scrollTo({top:d.getBoundingClientRect().top+scrollY-80,behavior:"smooth"}),30);
+}
+title();
+</script>
+</body>
+</html>
