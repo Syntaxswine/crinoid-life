@@ -46,7 +46,11 @@ body{background:var(--paper);color:var(--ink);font-family:var(--serif);
 #hud .lo{color:var(--bad)}
 #hud .r{margin-left:auto;color:var(--accent-2)}
 
-#fig{display:block;margin:0 auto 10px;width:150px;height:190px}
+#stage{position:sticky;top:0;z-index:15;background:#070b0c;margin:0 -16px 20px;line-height:0}
+#stage canvas{display:block;margin:0 auto;width:min(100%,calc(34vh * 9 / 5));aspect-ratio:9/5;height:auto}
+#stage-pause{position:absolute;right:8px;bottom:8px;width:34px;height:30px;line-height:1;border:1px solid #2f3a38;
+  background:rgba(7,11,12,.7);color:#8f9a95;font:12px var(--mono);cursor:pointer;border-radius:3px}
+#stage-pause:hover,#stage-pause:focus-visible{color:#dde2dc;border-color:#8f9a95;outline:none}
 #log > *{animation:fade .28s ease-out}
 @keyframes fade{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
 @media (prefers-reduced-motion:reduce){#log > *{animation:none}}
@@ -69,7 +73,7 @@ body{background:var(--paper);color:var(--ink);font-family:var(--serif);
 .choice .gloss{display:block;font-family:var(--mono);font-size:11px;color:var(--ink-2);margin-top:.15em;line-height:1.5}
 .choice.warn .gloss{color:var(--bad)}
 
-#title{padding:9vh 0 0;text-align:center}
+#title{padding:2vh 0 0;text-align:center}
 #title h1{font-family:var(--mono);font-size:clamp(26px,7vw,42px);font-weight:400;letter-spacing:.24em;margin:0 0 .15em}
 #title .sub{font-size:15px;color:var(--ink-2);margin:0 0 2em;font-style:italic}
 #title .blurb{text-align:left;margin:0 auto 2.2em;max-width:480px;color:var(--ink-2);font-size:16px}
@@ -120,6 +124,7 @@ footer{margin-top:4em;padding-top:1.2em;border-top:1px solid var(--rule);font-fa
 <body>
 <div id="hud" class="hidden"><div class="in"></div></div>
 <div class="wrap">
+  <div id="stage"><canvas id="stage-c" width="1080" height="600" role="img" aria-label="An animated crinoid on the sea floor"></canvas><button id="stage-pause" type="button"></button></div>
   <section id="title">
     <h1>HOLD ON</h1>
     <p class="sub">the life of a crinoid, in ten seasons or fewer</p>
@@ -144,7 +149,6 @@ footer{margin-top:4em;padding-top:1.2em;border-top:1px solid var(--rule);font-fa
     </div>
   </dialog>
   <section id="game" class="hidden">
-    <svg id="fig" viewBox="0 0 150 190" aria-hidden="true"></svg>
     <div id="log"></div>
     <div id="choices"></div>
   </section>
@@ -172,44 +176,412 @@ function save(id){const g=got();if(g.includes(id))return false;g.push(id);
 let S;
 const MAX_SEASON=10;
 
-/* ------------------------------------------------------------ the figure */
-function drawFig(){
-  const f=$("#fig"); if(!S){f.innerHTML="";return}
-  let h="";
-  const gy=182;
-  h+=`<line x1="4" y1="${gy}" x2="146" y2="${gy}" stroke="var(--rule)" stroke-width="1"/>`;
-  if(S.phase==="larva"){
-    const y=60+S.day*28;
-    h+=`<ellipse cx="75" cy="${y}" rx="9" ry="13" fill="none" stroke="var(--crin)" stroke-width="1.4"/>`;
-    for(let i=-2;i<=2;i++) h+=`<line x1="66" y1="${y+i*5}" x2="84" y2="${y+i*5}" stroke="var(--crin)" stroke-width=".7" opacity=".6"/>`;
-    f.innerHTML=h; return;
+/* ============================================================== the stage */
+// A window into the sea above the story. It reads S every frame (arms, stalk,
+// era, tenants, what the season brought) and plays short cues when something
+// happens. Same drawing as the trailer (video/trailer.html), scaled down.
+const STAGE=(()=>{
+  const cv=$("#stage-c"), X=cv.getContext("2d"), W=1080, H=600, FLOOR=548, SC=0.5;
+  const RM=matchMedia("(prefers-reduced-motion: reduce)").matches;
+  let paused=RM; try{const p=localStorage.getItem("crinoid-stage-paused"); if(p!==null) paused=p==="1"}catch(e){}
+  const C={ink:"#dde2dc",ink2:"#8f9a95",rule:"#2f3a38",rose:"#c77892",roseD:"#9a4a63",teal:"#77b3b8",
+    stalk:"#8a8576",mud:"#4a3f33",stone:"#b8ab93",stoneD:"#857a66",bad:"#d1776c"};
+  const SERIF='"Palatino Linotype","Book Antiqua",Palatino,Georgia,serif', MONO='Consolas,ui-monospace,monospace';
+  const clamp=(v,a=0,b=1)=>Math.max(a,Math.min(b,v)), ramp=(t,a,b)=>clamp((t-a)/(b-a)), ease=u=>u*u*(3-2*u);
+  const lerp=(a,b,u)=>a+(b-a)*u, hash=n=>{const s=Math.sin(n*127.1+311.7)*43758.5453;return s-Math.floor(s)};
+  const mix=(a,b,u)=>{const p=h=>[1,3,5].map(i=>parseInt(h.slice(i,i+2),16)),A=p(a),B=p(b);
+    return "#"+A.map((v,i)=>Math.round(lerp(v,B[i],u)).toString(16).padStart(2,"0")).join("")};
+
+  let clock=0,last=performance.now(),cue={name:"title",t:0,data:null};
+  const d={x:540,open:.4,stalk:232,lie:0,dir:-1,grow:1,onSub:true,crownX:540,crownY:300,larvaY:120,grey:0,growT:-9,snailT:-9,subX:540};
+  let prev=null, debris=[], carriers=[], pieces=[];
+  const U={on:false,x:1400,side:1,target:0,home:540};
+
+  /* ---------------------------------------------------------- drawing kit */
+  function water(t,era,drift,n=110){
+    const g=X.createLinearGradient(0,0,0,H);
+    if(era==="carb"){g.addColorStop(0,"#1c3836");g.addColorStop(1,"#0b1614")}
+    else{g.addColorStop(0,"#0f1a1c");g.addColorStop(1,"#05090a")}
+    X.fillStyle=g;X.fillRect(0,0,W,H);
+    if(era==="carb"){
+      for(let k=0;k<5;k++){const x0=((k*300+t*14)%1500)-200;
+        X.fillStyle="rgba(150,200,185,0.035)";X.beginPath();X.moveTo(x0,0);X.lineTo(x0+110,0);X.lineTo(x0-150,H);X.lineTo(x0-320,H);X.fill()}
+    }
+    for(let k=0;k<n;k++){
+      const sp=10+hash(k)*22,sz=1+hash(k+9)*2.2;
+      let x=hash(k+3)*W,y=(hash(k+5)*H+t*sp)%(FLOOR+20);
+      x=((x+t*drift*(0.6+hash(k+7)))%(W+60)+W+60)%(W+60)-30;
+      X.globalAlpha=0.16+hash(k+11)*0.3;X.fillStyle=C.ink;
+      if(drift>60) X.fillRect(x,y,sz*6,sz*.8); else{X.beginPath();X.arc(x,y,sz,0,7);X.fill()}
+    }
+    X.globalAlpha=1;
   }
-  if(S.phase==="gone"){f.innerHTML=h;return}
-  const sh=Math.min(120,24+S.stalk*1.6), top=gy-sh;
-  h+=`<line x1="75" y1="${gy}" x2="75" y2="${top}" stroke="var(--stalk)" stroke-width="3"/>`;
-  for(let y=gy-4;y>top+2;y-=4) h+=`<line x1="72.5" y1="${y}" x2="77.5" y2="${y}" stroke="var(--paper)" stroke-width=".8"/>`;
-  if(!S.feather) h+=`<path d="M68 ${gy} q7 -6 14 0" fill="none" stroke="var(--stalk)" stroke-width="2"/>`;
-  h+=`<path d="M68 ${top} L82 ${top} L79 ${top+8} L71 ${top+8} Z" fill="var(--crin)"/>`;
-  const n=S.arms, open=S.open;
-  for(let i=0;i<n;i++){
-    const t=n===1?0:i/(n-1)-.5;
-    const a=(open?t*150:t*26)*Math.PI/180, L=open?52:44;
-    const x0=75+t*10, y0=top;
-    const x1=x0+Math.sin(a)*L*.55, y1=y0-Math.cos(a)*L*.55;
-    const x2=x0+Math.sin(a*(open?1.15:.3))*L, y2=y0-Math.cos(a*(open?1.15:.3))*L+(open?0:6);
-    h+=`<path d="M${x0} ${y0} Q${x1} ${y1} ${x2} ${y2}" fill="none" stroke="var(--crin)" stroke-width="1.5" stroke-linecap="round"/>`;
-    if(open) for(let k=1;k<5;k++){const u=k/5,px=(1-u)*(1-u)*x0+2*u*(1-u)*x1+u*u*x2,py=(1-u)*(1-u)*y0+2*u*(1-u)*y1+u*u*y2;
-      h+=`<line x1="${px-2.5}" y1="${py-1.5}" x2="${px+2.5}" y2="${py+1.5}" stroke="var(--crin)" stroke-width=".6" opacity=".7"/>`}
+  function ground(){
+    X.fillStyle="#0c1213";X.fillRect(0,FLOOR,W,H-FLOOR);
+    X.strokeStyle=C.rule;X.lineWidth=2;X.beginPath();X.moveTo(0,FLOOR);X.lineTo(W,FLOOR);X.stroke();
+    for(let k=0;k<30;k++){X.fillStyle="#1a2322";X.beginPath();X.ellipse(hash(k+40)*W,FLOOR+8+hash(k+41)*40,5+hash(k)*14,2+hash(k+2)*4,0,0,7);X.fill()}
   }
-  if(S.snail) h+=`<path d="M81 ${top+2} a4 4 0 1 1 5 4 a2 2 0 1 1 -2 -2" fill="none" stroke="var(--accent-2)" stroke-width="1.3"/>`;
-  S.tenants.forEach((_,i)=>{h+=`<circle cx="${62+i*9}" cy="${top-6-(i%2)*5}" r="2" fill="var(--accent-2)"/>`});
-  f.innerHTML=h;
-}
+  const SUBH={rock:58,shell:24,stem:20,sand:0};
+  function substrate(kind,x){
+    if(kind==="rock"){X.fillStyle="#28302f";X.beginPath();X.moveTo(x-150,FLOOR);
+      X.bezierCurveTo(x-150,FLOOR-60,x-30,FLOOR-70,x+40,FLOOR-58);X.bezierCurveTo(x+130,FLOOR-52,x+150,FLOOR-24,x+150,FLOOR);
+      X.closePath();X.fill();X.strokeStyle="#3a4442";X.lineWidth=3;X.stroke()}
+    else if(kind==="shell"){X.fillStyle="#5f5a4e";X.beginPath();X.ellipse(x,FLOOR,80,26,0,Math.PI,0);X.fill();
+      X.strokeStyle="#77705f";X.lineWidth=2;for(let k=-4;k<=4;k++){X.beginPath();X.moveTo(x,FLOOR);X.lineTo(x+k*18,FLOOR-24+Math.abs(k)*2.4);X.stroke()}}
+    else if(kind==="stem"){X.fillStyle=C.stalk;X.fillRect(x-140,FLOOR-20,280,20);
+      X.strokeStyle="#0e1415";X.lineWidth=2;for(let k=-130;k<140;k+=12){X.beginPath();X.moveTo(x+k,FLOOR-20);X.lineTo(x+k,FLOOR);X.stroke()}}
+    else if(kind==="sand"){X.fillStyle="#4a4638";X.beginPath();X.ellipse(x,FLOOR+2,190,16,0,Math.PI,0);X.fill();
+      for(let k=0;k<40;k++){X.fillStyle="#6a6450";X.fillRect(x-170+hash(k+90)*340,FLOOR-12+hash(k+91)*12,2,2)}}
+  }
+  // the crinoid. o = open 0..1; lie 0..1 (crown toward dir); swim = feather-star strokes
+  function crinoid(p){
+    const {x,y,stalk=520,open=1,t=0,lie=0,dir=-1,row=0,s=1,stone=false,arms=10,alpha=1,roots=true,grow=1,
+      detail=true,lw=1,swayAmp=1,swim=null,grey=0,lastArm=1,noStalk=false,noCrown=false,lean=0}=p;
+    X.save();X.globalAlpha=alpha;X.translate(x,y-lie*38*s);X.rotate(dir*lie*Math.PI/2*0.94+lean);X.scale(s,s);
+    const g=c=>grey?mix(c,"#6c6c68",grey):c;
+    const rose=g(stone?C.stoneD:C.rose),roseD=g(stone?"#6f6555":C.roseD),stk=g(stone?"#9d917b":C.stalk);
+    const sway=(1-lie)*Math.sin(t*0.7)*0.05*swayAmp+(swayAmp>1?Math.sin(t*2.3)*0.03*swayAmp:0);
+    const len=noStalk?0:stalk*grow,tx=Math.sin(sway)*len,ty=-len;
+    if(!noStalk&&len>1){
+      X.strokeStyle=stk;X.lineWidth=16;X.lineCap="round";
+      X.beginPath();X.moveTo(0,0);X.quadraticCurveTo(tx*.2,ty*.5,tx,ty);X.stroke();
+      X.strokeStyle=stone?"#b9ad95":"#0e1415";X.lineWidth=2.5;X.beginPath();
+      for(let u=.03;u<.97;u+=16/Math.max(len,1)){const px=2*u*(1-u)*tx*.2+u*u*tx,py=2*u*(1-u)*ty*.5+u*u*ty;X.moveTo(px-8,py);X.lineTo(px+8,py)}
+      X.stroke();
+      X.strokeStyle=stk;X.lineWidth=5;X.beginPath();
+      for(let u=.2;u<.9&&u<=grow;u+=.22){const px=2*u*(1-u)*tx*.2+u*u*tx,py=2*u*(1-u)*ty*.5+u*u*ty;
+        for(const sd of[-1,1]){X.moveTo(px,py);X.quadraticCurveTo(px+sd*40,py-10,px+sd*46,py+22)}}
+      X.stroke();
+      if(roots&&lie<.5){X.lineWidth=8;X.beginPath();for(const sd of[-1,-.45,.45,1]){X.moveTo(0,-6);X.quadraticCurveTo(sd*26,4,sd*60,8)}X.stroke()}
+    }
+    if(noCrown||grow<.35){X.restore();return{topX:x+tx*s,topY:y+ty*s}}
+    const crown=clamp((grow-.35)/.65);
+    X.save();X.translate(tx,ty);X.rotate(sway*1.5);
+    if(noStalk){X.strokeStyle=stk;X.lineWidth=5;X.beginPath();   // feather-star cirri under the cup
+      for(let k=0;k<7;k++){const a=(k/6-.5)*2.2;X.moveTo(0,0);X.quadraticCurveTo(Math.sin(a)*30,20,Math.sin(a)*52,34+Math.cos(t*3+k)*4)}X.stroke()}
+    X.fillStyle=rose;X.beginPath();X.moveTo(-34*crown,0);X.lineTo(34*crown,0);X.lineTo(48*crown,-44*crown);X.lineTo(-48*crown,-44*crown);X.closePath();X.fill();
+    const n=arms,spread=lerp(.35,2.55,open);
+    const pin=new Path2D(),arm=new Path2D();
+    for(let i=0;i<n;i++){
+      const u=n===1?0:i/(n-1)-.5;
+      let wob=Math.sin(t*.9+i*1.7)*.05+(row?Math.sin(row+i*.63)*.35*(1-open):0);
+      if(swim!==null) wob+=Math.sin(swim+(i%2)*Math.PI)*.45;
+      const a=u*spread+wob,Lr=(300+(1-Math.abs(u))*70)*crown*(i===n-1?lastArm:1);
+      if(Lr<4) continue;
+      const bx=u*60*crown,by=-40*crown;
+      const cx=bx+Math.sin(a*.75)*Lr*.55,cy=by-Math.cos(a*.75)*Lr*.55;
+      const curl=lerp(1.1,.25,open);
+      const ex=bx+Math.sin(a)*Lr,ey=by-Math.cos(a)*Lr;
+      const kx=ex-Math.sin(a)*60*curl+Math.cos(a)*-u*90*curl,ky=ey+Math.cos(a)*60*curl+Math.sin(a)*-u*90*curl;
+      const pts=[];
+      for(let k=0;k<=24;k++){const v=k/24;pts.push([(1-v)**2*bx+2*v*(1-v)*cx+v*v*ex,(1-v)**2*by+2*v*(1-v)*cy+v*v*ey])}
+      for(let k=1;k<=8;k++){const v=k/8;pts.push([(1-v)**2*ex+2*v*(1-v)*(ex+(ex-cx)*.3)+v*v*kx,(1-v)**2*ey+2*v*(1-v)*(ey+(ey-cy)*.3)+v*v*ky])}
+      if(detail) for(let k=1;k<pts.length-1;k++){
+        const[x0,y0]=pts[k-1],[x1,y1]=pts[k+1],[px,py]=pts[k];
+        const dl=Math.hypot(x1-x0,y1-y0)||1,nx=-(y1-y0)/dl,ny=(x1-x0)/dl,fx=(x1-x0)/dl,fy=(y1-y0)/dl;
+        const pl=30*(1-k/pts.length*.6)*(.35+.65*open);
+        for(const sd of[-1,1]){pin.moveTo(px,py);pin.lineTo(px+sd*nx*pl+fx*pl*.7,py+sd*ny*pl+fy*pl*.7)}
+      }
+      arm.moveTo(pts[0][0],pts[0][1]);for(const q of pts) arm.lineTo(q[0],q[1]);
+    }
+    X.lineCap="round";X.lineJoin="round";
+    if(detail){X.strokeStyle=roseD;X.lineWidth=3.2*lw;X.stroke(pin)}
+    X.strokeStyle=rose;X.lineWidth=9*lw;X.stroke(arm);
+    X.restore();X.restore();
+    return{topX:x+tx*s,topY:y+ty*s};
+  }
+  function larva(x,y,t,s=.55,a=1){
+    X.save();X.globalAlpha=a;X.translate(x,y);X.rotate(Math.sin(t*1.3)*.12);X.scale(s,s);
+    X.fillStyle="#2a1f25";X.strokeStyle=C.rose;X.lineWidth=5;X.beginPath();X.ellipse(0,0,70,105,0,0,7);X.fill();X.stroke();
+    X.fillStyle="#d9b45a";X.globalAlpha=a*.85;X.beginPath();X.ellipse(0,12,38,48,0,0,7);X.fill();X.globalAlpha=a;
+    X.strokeStyle=C.teal;X.lineWidth=3;
+    for(let b=-2;b<=2;b++){const yy=b*38,hw=Math.sqrt(Math.max(0,1-(yy/105)**2))*70;
+      X.beginPath();X.moveTo(-hw,yy);X.lineTo(hw,yy);
+      for(let c=-hw;c<=hw;c+=10){const ph=Math.sin(t*14+c*.3+b);X.moveTo(c,yy);X.lineTo(c+ph*6,yy-12)}X.stroke()}
+    X.restore();
+  }
+  function urchin(x,y,t,s=.5){
+    X.save();X.translate(x,y+Math.sin(t*2)*2);X.scale(s,s);
+    X.strokeStyle="#b9a37a";X.fillStyle="#b9a37a";X.lineCap="round";X.lineWidth=11;
+    for(let k=0;k<13;k++){const a=-Math.PI*.95+k/12*Math.PI*1.9+Math.sin(t*1.3+k)*.04;
+      X.beginPath();X.moveTo(Math.cos(a)*70,Math.sin(a)*60);X.lineTo(Math.cos(a)*190,Math.sin(a)*175);X.stroke();
+      X.beginPath();X.arc(Math.cos(a)*190,Math.sin(a)*175,7,0,7);X.fill()}
+    X.fillStyle="#6d3b3b";X.beginPath();X.ellipse(0,0,90,76,0,0,7);X.fill();
+    X.fillStyle="#8d5454";for(let r=0;r<5;r++)for(let k=0;k<9;k++){const a=k/9*7+r;X.beginPath();X.arc(Math.cos(a)*r*16,Math.sin(a)*r*13,5,0,7);X.fill()}
+    X.restore();
+  }
+  function fish(x,y,dir,t,carry){
+    X.save();X.translate(x,y);X.scale(dir,1);
+    X.fillStyle="#7f9c9e";X.beginPath();X.ellipse(0,0,46,18,0,0,7);X.fill();
+    X.beginPath();X.moveTo(-40,0);X.lineTo(-70,-18+Math.sin(t*12)*5);X.lineTo(-70,18+Math.sin(t*12)*5);X.closePath();X.fill();
+    X.fillStyle="#0e1415";X.beginPath();X.arc(28,-4,4,0,7);X.fill();
+    if(carry){X.strokeStyle=C.rose;X.lineWidth=4;X.beginPath();X.moveTo(44,4);X.quadraticCurveTo(64,14,78,34);X.stroke();
+      X.lineWidth=1.6;X.beginPath();for(let k=0;k<5;k++){const px=48+k*6,py=6+k*6;X.moveTo(px,py);X.lineTo(px+8,py-5);X.moveTo(px,py);X.lineTo(px-6,py+6)}X.stroke()}
+    X.restore();
+  }
+  function armBit(x,y,rot,a){
+    X.save();X.globalAlpha=a;X.translate(x,y);X.rotate(rot);X.strokeStyle=C.rose;X.lineWidth=4;
+    X.beginPath();X.moveTo(-22,0);X.quadraticCurveTo(0,-8,22,0);X.stroke();
+    X.lineWidth=1.5;X.beginPath();for(let k=-16;k<=16;k+=6){X.moveTo(k,-3);X.lineTo(k+4,-10);X.moveTo(k,-1);X.lineTo(k+4,7)}X.stroke();X.restore();
+  }
+  function tenant(kind,x,y,t,k){
+    X.save();X.translate(x+Math.sin(t*1.7+k)*4,y+Math.cos(t*1.3+k*2)*3);X.scale(1.9,1.9);
+    if(kind==="shrimp"){X.strokeStyle="#d58da2";X.lineWidth=7;X.lineCap="round";X.beginPath();X.arc(0,0,12,Math.PI*.9,Math.PI*2.1);X.stroke();
+      X.lineWidth=1.3;X.beginPath();X.moveTo(12,-2);X.quadraticCurveTo(30,-18,40,-10);X.moveTo(12,0);X.quadraticCurveTo(30,-8,42,2);X.stroke()}
+    else if(kind==="clingfish"){X.fillStyle="#d8c060";X.beginPath();X.ellipse(0,0,15,7,0,0,7);X.fill();
+      X.beginPath();X.moveTo(-13,0);X.lineTo(-24,-7);X.lineTo(-24,7);X.fill();X.fillStyle="#1a1a1a";X.beginPath();X.arc(8,-2,2,0,7);X.fill()}
+    else if(kind==="worm"){X.fillStyle="#e0d6c8";X.beginPath();for(let a=0;a<6.3;a+=.35){const r=11+Math.sin(a*9)*2;X.lineTo(Math.cos(a)*r*1.3,Math.sin(a)*r)}X.fill()}
+    else if(kind==="lobster"){X.fillStyle="#d9763a";X.beginPath();X.ellipse(0,0,13,9,0,0,7);X.fill();
+      X.strokeStyle="#d9763a";X.lineWidth=3;X.beginPath();X.moveTo(10,-3);X.lineTo(34,-14);X.moveTo(10,3);X.lineTo(34,10);X.stroke();
+      X.beginPath();X.arc(36,-14,4,0,7);X.arc(36,10,4,0,7);X.fillStyle="#d9763a";X.fill()}
+    else if(kind==="snail"){X.fillStyle="#8fb5b0";X.beginPath();X.arc(0,0,15,0,7);X.fill();
+      X.strokeStyle="#5f807c";X.lineWidth=2.5;X.beginPath();for(let a=0;a<12;a+=.3){const r=14-a;if(r<1)break;X.lineTo(Math.cos(a)*r,Math.sin(a)*r)}X.stroke()}
+    X.restore();
+  }
+  const TEN_AT=[[-95,-40],[85,-80],[-35,-125],[120,-20],[-130,-100],[40,-160]];
+
+  /* ------------------------------------------------------------ slabs */
+  function slabDrawer(a){
+    X.save();X.globalAlpha=a;X.fillStyle=C.stone;X.fillRect(0,0,W,H);
+    for(let k=0;k<500;k++){X.fillStyle=hash(k)>.5?"#a99c84":"#c6baa3";X.fillRect(hash(k+1)*W,hash(k+2)*H,2+hash(k+3)*6,2+hash(k+4)*4)}
+    X.save();X.translate(150,560);X.rotate(1.0);crinoid({x:0,y:0,stalk:470,open:.35,stone:true,roots:false,s:.5});X.restore();
+    X.fillStyle="#efe9da";X.fillRect(660,420,380,120);X.strokeStyle="#7a6f5c";X.lineWidth=2;X.strokeRect(660,420,380,120);
+    X.fillStyle="#2a2622";X.font=`600 28px ${MONO}`;X.fillText("CRINOIDEA",682,462);
+    X.font=`22px ${MONO}`;X.fillText("Mississippian · complete",682,496);X.fillText("Crawfordsville, Indiana",682,524);
+    X.restore();
+  }
+  function slabLimestone(a,t){
+    X.save();X.globalAlpha=a;X.fillStyle="#cbbfa8";X.fillRect(0,0,W,H);
+    for(let k=0;k<260;k++){
+      const x=hash(k+200)*W,y=hash(k+201)*H,r=5+hash(k+202)*20,ob=.35+hash(k+203)*.65,rot=hash(k+204)*3;
+      X.save();X.translate(x,y);X.rotate(rot);X.scale(1,ob);
+      X.fillStyle=hash(k+205)>.5?"#b5a88f":"#ddd3be";X.beginPath();X.arc(0,0,r,0,7);X.fill();
+      X.strokeStyle="#9d9079";X.lineWidth=1.5;X.stroke();
+      if(r>9){X.fillStyle="#8c7f68";X.beginPath();for(let q=0;q<5;q++){const aa=q/5*6.283-1.57;X.lineTo(Math.cos(aa)*r*.22,Math.sin(aa)*r*.22)}X.fill()}
+      X.restore();
+    }
+    if(S&&S.snail){X.save();X.translate(760,250);X.strokeStyle="#6f6553";X.lineWidth=4;X.beginPath();
+      for(let q=0;q<14;q+=.2){const r=40-q*2.8;if(r<2)break;X.lineTo(Math.cos(q)*r,Math.sin(q)*r)}X.stroke();X.restore()}
+    const sx=((t*120)%(W+900))-450;const gr=X.createLinearGradient(sx,0,sx+400,H);
+    gr.addColorStop(0,"rgba(255,255,255,0)");gr.addColorStop(.5,"rgba(255,255,255,0.18)");gr.addColorStop(1,"rgba(255,255,255,0)");
+    X.fillStyle=gr;X.fillRect(0,0,W,H);
+    X.fillStyle="rgba(30,26,22,.75)";X.font=`22px ${MONO}`;X.fillText("BURLINGTON LIMESTONE · POLISHED",24,H-24);
+    X.restore();
+  }
+  function beach(a,t){
+    X.save();X.globalAlpha=a;
+    const sea=X.createLinearGradient(0,0,0,230);sea.addColorStop(0,"#56666a");sea.addColorStop(1,"#6f7f80");
+    X.fillStyle=sea;X.fillRect(0,0,W,230);
+    X.fillStyle="#c9b894";X.fillRect(0,200,W,H-200);
+    const wy=205+Math.sin(t*.8)*18;
+    X.fillStyle="#a99c7c";X.fillRect(0,wy-8,W,40);
+    X.fillStyle="#e9e6dc";X.beginPath();X.moveTo(0,wy);for(let x=0;x<=W;x+=24)X.lineTo(x,wy+Math.sin(x*.03+t*2)*5);X.lineTo(W,wy-14);X.lineTo(0,wy-14);X.fill();
+    for(let k=0;k<120;k++){X.fillStyle=hash(k+300)>.5?"#b8a782":"#d8c8a4";X.fillRect(hash(k+301)*W,240+hash(k+302)*360,3,3)}
+    const bead=(x,y,r)=>{X.fillStyle="#e3dccb";X.beginPath();X.arc(x,y,r,0,7);X.fill();X.strokeStyle="#a1977f";X.lineWidth=2;X.stroke();
+      X.fillStyle="#8c8068";X.beginPath();for(let q=0;q<5;q++){const aa=q/5*6.283-1.57;X.lineTo(x+Math.cos(aa)*r*.3,y+Math.sin(aa)*r*.3)}X.fill()};
+    X.strokeStyle="#3b2f25";X.lineWidth=2.5;X.beginPath();
+    const P=[];for(let k=0;k<=26;k++){const u=k/26,x=260+u*560,y=330+Math.sin(u*Math.PI)*150+Math.sin(u*11)*6;P.push([x,y]);X.lineTo(x,y)}X.stroke();
+    P.forEach(([x,y],k)=>bead(x,y,k%9===0?15:11));
+    X.beginPath();X.moveTo(540,480);X.lineTo(540,540);X.stroke();X.fillStyle="#3b2f25";X.fillRect(530,528,20,5);X.fillRect(537,520,6,24);
+    for(let k=0;k<12;k++) bead(80+hash(k+320)*920,280+hash(k+321)*290,8+hash(k+322)*5);
+    X.fillStyle="rgba(30,26,22,.7)";X.font=`22px ${MONO}`;X.fillText("LINDISFARNE",24,H-24);
+    X.restore();
+  }
+
+  /* ------------------------------------------------------------ state */
+  const stalkPx=()=>Math.min(560,150+(S?S.stalk:6)*11.5);
+  const baseY=()=>d.onSub&&S?FLOOR-SUBH[S.sub||"rock"]:FLOOR;
+  function spawnPieces(){
+    pieces=[];const top=d.crownY,x0=d.x,b=baseY();
+    const n=Math.round(stalkPx()/16);
+    for(let k=0;k<n;k++){const y=lerp(b,top+40,k/n);pieces.push({x:x0+(hash(k+500)-.5)*8,y,vx:(hash(k+501)-.5)*160,vy:0,r:hash(k+502)*3,vr:(hash(k+503)-.5)*3,kind:"disc"})}
+    for(let k=0;k<70;k++){const a=(hash(k+510)-.5)*2.6,rr=hash(k+511)*130;
+      pieces.push({x:d.crownX+Math.sin(a)*rr,y:d.crownY-Math.cos(a)*rr,vx:(hash(k+512)-.5)*200,vy:-10,r:hash(k+513)*3,vr:(hash(k+514)-.5)*4,kind:"bit"})}
+  }
+  function stepPieces(dt){for(const p of pieces){if(p.rest)continue;p.vy+=40*dt;p.vx*=1-dt*1.2;p.x+=p.vx*dt;p.y+=p.vy*dt;p.r+=p.vr*dt;
+    if(p.y>=FLOOR-4-(p.kind==="disc"?3:1)){p.y=FLOOR-4;p.rest=true}}}
+  function drawPieces(a=1){X.save();X.globalAlpha=a;for(const p of pieces){
+    if(p.kind==="disc"){X.save();X.translate(p.x,p.y);X.rotate(p.r);X.fillStyle=C.stalk;X.fillRect(-11,-5,22,10);X.fillStyle="#0e1415";X.fillRect(-2,-2,4,4);X.restore()}
+    else{X.strokeStyle=C.rose;X.lineWidth=5;X.lineCap="round";X.beginPath();X.moveTo(p.x-9*Math.cos(p.r),p.y-9*Math.sin(p.r));X.lineTo(p.x+9*Math.cos(p.r),p.y+9*Math.sin(p.r));X.stroke()}}X.restore()}
+
+  function sync(){
+    if(!S){prev=null;return kick()}
+    if(prev&&S.phase==="sessile"&&prev.phase==="sessile"){
+      const lost=prev.arms-S.arms;
+      if(lost>0){
+        let rest=lost;
+        if(S.ev==="fish") rest--;
+        else if(S.ev==="current"&&S.era==="now"){carriers.push({t0:clock,y:d.crownY-40});rest--}
+        for(let k=0;k<rest;k++) debris.push({x:d.crownX+(Math.random()-.5)*120,y:d.crownY-60-Math.random()*60,
+          vx:S.ev==="storm"?220+Math.random()*120:(Math.random()-.5)*40,vy:S.ev==="storm"?-20:10,rot:Math.random()*6,t0:clock});
+      }
+      if(S.arms>prev.arms) d.growT=clock;
+      if(S.snail&&!prev.snail) d.snailT=clock;
+    }
+    prev={arms:S.arms,phase:S.phase,snail:S.snail};
+    kick();
+  }
+  function play(name,data){
+    cue={name,t:clock,data};
+    if(name==="larva"){d.larvaY=110;d.onSub=true;d.x=540;d.subX=540;debris=[];carriers=[];pieces=[];U.on=false;d.grey=0}
+    if(name==="settle"){d.x=540;d.grow=0}
+    if(name==="season"&&S&&S.ev==="urchin"){U.on=true;U.side=d.x<400?-1:1;U.x=d.x+U.side*720;U.target=d.x+U.side*230;U.home=d.x}
+    if(name==="crawl"){d.from=d.x;d.dir=-U.side;d.to=clamp(d.x+d.dir*260,200,880)}
+    if(name==="end"&&["apart","limestone","beads"].includes(data)) spawnPieces();
+    if(name==="end"&&data==="eaten"){U.on=true;if(U.x>1200||U.x<-120){U.side=1;U.x=d.x+620}}
+    sync();
+  }
+
+  /* ------------------------------------------------------------ frame */
+  function frame(dt){
+    const t=paused?4:clock, ce=paused?99:clock-cue.t;
+    if(!S){                                            // title: somebody holding on
+      water(t,"carb",0);ground();substrate("rock",540);
+      for(const[mx,sc,k] of [[150,.2,1],[300,.26,2],[790,.24,3],[950,.19,4]]) crinoid({x:mx,y:FLOOR,t:t+k,stalk:500,open:.5+.2*Math.sin(t*.5+k),s:sc,alpha:.35,detail:false});
+      crinoid({x:540,y:FLOOR-58,t,stalk:300,open:.55+.35*Math.sin(t*.45),s:SC,lw:1.4});
+      return;
+    }
+    const era=S.era, ev=S.ev;
+    if(cue.name==="end") return ending(cue.data,t,ce,dt);
+    if(S.phase==="larva"){
+      water(t,era,0);ground();substrate(S.sub,540);
+      const ty=lerp(130,300,(S.day-1)/2);d.larvaY+=(ty-d.larvaY)*Math.min(1,dt*1.5);if(paused)d.larvaY=ty;
+      larva(540+Math.sin(t*.9)*120,d.larvaY,t);
+      return;
+    }
+    // life on the stalk
+    const storm=ev==="storm",cur=ev==="current";
+    water(t,era,cur?240:storm?120:0);
+    if(era==="carb") for(const[mx,sc,k] of [[90,.22,1],[210,.28,2],[340,.2,3],[760,.26,4],[880,.21,5],[1000,.29,6]])
+      crinoid({x:mx,y:FLOOR,t:t+k,stalk:520,open:cur?.9:.45,s:sc,alpha:.3,detail:false,swayAmp:storm?3:1});
+    ground();substrate(S.sub,d.subX);
+    // targets
+    const openT=S.open?1:cur?.1:storm?.06:ev==="slack"?.45:.35;
+    d.open+=(openT-d.open)*Math.min(1,dt*2.2);if(paused)d.open=openT;
+    const sp=stalkPx();d.stalk+=(sp-d.stalk)*Math.min(1,dt*1.5);if(paused)d.stalk=sp;
+    d.grow=cue.name==="settle"?ease(ramp(ce,1.3,3.6)):1;
+    let row=0;
+    if(cue.name==="crawl"){
+      if(ce<1){d.lie=ease(ce)}else if(ce<3.8){d.lie=1;d.x=lerp(d.from,d.to,ease((ce-1)/2.8));row=t*3.2}
+      else if(ce<4.8){d.lie=1-ease(ce-3.8);d.x=d.to;d.onSub=false}else{d.lie=0;d.x=d.to;d.onSub=false}
+    }else d.lie=0;
+    if(cue.name==="settle"&&ce<1.3) larva(540,lerp(d.larvaY,baseY()-30,ease(ce/1.3)),t);
+    const lastArm=clamp((clock-d.growT)/1.6);
+    const top=crinoid({x:d.x,y:lerp(baseY(),FLOOR-10,d.lie),t,stalk:d.stalk,open:d.open,s:SC*(1-.28*d.lie),lie:d.lie,dir:d.dir,row,
+      grow:d.grow,arms:S.arms,lastArm:paused?1:lastArm,lw:1.4,swayAmp:storm?3:1});
+    d.crownX=top.topX;d.crownY=top.topY-40*SC;
+    if(d.grow<.35){return}
+    // food drawn in
+    if(cur&&S.open) for(let k=0;k<16;k++){const ph=(t*.35+k/16)%1,y0=d.crownY+(hash(k)-.5)*300;
+      X.globalAlpha=Math.min(1,ph*4)*.8;X.fillStyle=k%3?C.ink:C.teal;X.beginPath();
+      X.arc(lerp(-30,d.crownX,Math.pow(ph,.8)),lerp(y0,d.crownY,ph*ph),2.6,0,7);X.fill();X.globalAlpha=1}
+    // who lives here
+    if(S.snail){const u=ease(ramp(clock-d.snailT,0,1.2));tenant("snail",lerp(d.x+8,d.crownX+18,paused?1:u),lerp(baseY()-d.stalk*SC*.6,d.crownY+22,paused?1:u),t,0)}
+    S.tenants.forEach((k,i)=>{const[ox,oy]=TEN_AT[i%TEN_AT.length];tenant(k,d.crownX+ox*d.open+ox*.3,d.crownY+oy*.9,t,i)});
+    if(ev==="tenant"&&S.visitor){
+      if(S.visitor==="snail"&&!S.snail) tenant("snail",d.x+10,lerp(baseY()-10,baseY()-d.stalk*SC*.6,ease(ramp(ce,0,6))),t,0);
+      else if(S.visitor!=="snail"){
+        const u=ease(ramp(ce,0,2.5));tenant(S.visitor,lerp(W+60,d.crownX+130,u)+Math.sin(t*1.5)*30,d.crownY-60+Math.cos(t*1.1)*25,t,7)}
+    }
+    // storm murk
+    if(storm){X.fillStyle="rgba(74,63,51,.42)";X.fillRect(0,0,W,H);
+      X.strokeStyle="rgba(150,130,100,.5)";X.lineWidth=2;X.beginPath();
+      for(let k=0;k<60;k++){const x=((hash(k+600)*W+t*420*(0.6+hash(k)))%(W+80))-40,y=(hash(k+601)*H+t*90)%H;X.moveTo(x,y);X.lineTo(x+26,y+6)}X.stroke()}
+    // a fish that wants an arm
+    if(ev==="fish"){
+      if(cue.name==="season"){const a=t*1.1;fish(d.crownX+Math.cos(a)*170,d.crownY-40+Math.sin(a*2)*40,Math.sin(a)>0?-1:1,t,false)}
+      else if(cue.name==="fish-take"||cue.name==="fish-leave"){
+        const u=ramp(ce,0,2.4);if(u<1) fish(lerp(d.crownX+60,W+120,ease(u)),d.crownY-50-u*60,1,t,cue.name==="fish-take")}
+    }
+    for(const c of carriers){const u=(clock-c.t0)/2.6;if(u>1)continue;
+      const x=u<.35?lerp(-100,d.crownX,u/.35):lerp(d.crownX,W+120,(u-.35)/.65);fish(x,c.y,1,t,u>.35)}
+    carriers=carriers.filter(c=>clock-c.t0<2.6);
+    for(const b of debris){const age=clock-b.t0;b.vy+=12*dt;b.x+=b.vx*dt;b.y+=b.vy*dt;armBit(b.x,Math.min(b.y,FLOOR-4),b.rot+age,clamp(1-age/6))}
+    debris=debris.filter(b=>clock-b.t0<6);
+    // the urchin
+    if(ev==="urchin"||U.on&&cue.name==="crawl"){
+      if(cue.name==="season"){U.x+=(U.target-U.x)*Math.min(1,dt*.45);if(paused)U.x=U.target}
+      else if(cue.name==="urchin-leave"){U.x+=U.side*70*dt;if(paused)U.x=U.target}
+      else if(cue.name==="crawl"){U.x+=(U.home+U.side*60-U.x)*Math.min(1,dt*.3);if(ce>6)U.x+=U.side*90*dt}
+      if(U.x>-250&&U.x<W+250) urchin(U.x,FLOOR-88,t);
+    }
+  }
+  function ending(id,t,ce,dt){
+    const era=S.era;
+    const base=()=>{water(t,era,0);ground()};
+    if(id==="drift"){base();const x=((ce*55+540)%1300)-110;larva(x,lerp(d.larvaY,160,ramp(ce,0,5))+Math.sin(t)*20,t,lerp(.55,.3,ramp(ce,0,5)),lerp(1,.6,ramp(ce,0,5)));return}
+    if(id==="sand"){base();substrate("sand",540);
+      if(ce<1.2){larva(540,lerp(d.larvaY,FLOOR-30,ease(ce/1.2)),t);return}
+      const k=ce-1.2,x=((540+k*80)%1300)-110;
+      X.save();X.translate(x,FLOOR-34);X.rotate(k*1.5);crinoid({x:0,y:40,t,stalk:90,open:.3,s:.22,grow:.8,roots:false});X.restore();return}
+    if(id==="drawer"){
+      const slab=ease(ramp(ce,2.8,3.6));
+      if(slab<1){water(t,"carb",0);ground();
+        for(const[mx,sc,k] of [[180,.3,1],[370,.38,2],[560,.45,3],[760,.34,4],[930,.28,5]]) crinoid({x:mx,y:FLOOR,t:t+k,stalk:520,open:.35,s:sc,detail:k===3});
+        X.fillStyle=`rgba(74,63,51,${.55*ease(ramp(ce,0,1))})`;X.fillRect(0,0,W,H);
+        const top=lerp(FLOOR+20,-20,ease(ramp(ce,.3,2.6)));
+        X.fillStyle=C.mud;X.beginPath();X.moveTo(0,H);for(let x=0;x<=W;x+=30)X.lineTo(x,top+Math.sin(x*.02+t*2)*10);X.lineTo(W,H);X.closePath();X.fill();
+        for(let k=0;k<7;k++){const yy=top+40+k*60;if(yy<H){X.fillStyle=k%2?"#54473a":"#40362b";X.fillRect(0,yy,W,14)}}}
+      if(slab>0) slabDrawer(slab);
+      return}
+    if(id==="limestone"||id==="beads"||id==="apart"){
+      stepPieces(paused?5:dt);
+      const out=id==="apart"?0:ease(ramp(ce,3.4,4.4));
+      if(out<1){base();if(S.sub&&d.onSub)substrate(S.sub,d.subX);
+        if(ce<1.2) crinoid({x:d.x,y:baseY(),t,stalk:d.stalk,open:d.open,s:SC,arms:S.arms,lw:1.4,alpha:1-ease(ce/1.2)});
+        drawPieces()}
+      if(out>0){if(id==="limestone")slabLimestone(out,t);else beach(out,t)}
+      return}
+    // endings that keep the animal on screen
+    base();if(S.sub&&d.onSub)substrate(S.sub,d.subX);
+    if(id==="feather"){
+      const fade=1-ramp(ce,.8,3.5);
+      crinoid({x:d.x,y:baseY(),t,stalk:d.stalk,s:SC,noCrown:true,alpha:fade+.001});
+      const rise=ease(ramp(ce,0,2.5)),lp=Math.max(0,ce-2.5);
+      const fx=lerp(d.crownX,540+Math.sin(lp*.3)*380,rise),fy=lerp(d.crownY,230+Math.sin(lp*.6)*60,rise);
+      X.save();X.translate(fx,fy+50);X.rotate(Math.cos(lp*.3)*.25);
+      crinoid({x:0,y:0,t,noStalk:true,open:.55,s:SC,arms:S.arms,lw:1.4,swim:ce*4.2});X.restore();return}
+    if(id==="eaten"){
+      const shrink=1-ease(ramp(ce,1.5,8));
+      if(U.on){U.x+=(d.x+40-U.x)*Math.min(1,dt*1.2);if(paused)U.x=d.x+40}
+      crinoid({x:d.x,y:baseY(),t,stalk:d.stalk*shrink,open:.25,s:SC,arms:S.arms,lw:1.4,alpha:1-ramp(ce,7,9)+.001});
+      urchin(U.x,FLOOR-88,t);return}
+    const openT=id==="starved"?0:id==="landlord"?.9:.7;
+    d.open+=(openT-d.open)*Math.min(1,dt*1.2);if(paused)d.open=openT;
+    const top=crinoid({x:d.x,y:baseY(),t,stalk:d.stalk,open:d.open,s:SC,arms:Math.max(0,S.arms),lw:1.4,
+      grey:id==="starved"?ease(ramp(ce,0,4)):0,lean:id==="starved"?-.08*ease(ramp(ce,1,5)):0});
+    d.crownX=top.topX;d.crownY=top.topY-40*SC;
+    if(S.snail) tenant("snail",d.crownX+18,d.crownY+22,t,0);
+    S.tenants.forEach((k,i)=>{const[ox,oy]=TEN_AT[i%TEN_AT.length],j=id==="landlord"?1.8:1;
+      tenant(k,d.crownX+ox*j+Math.sin(t*.8+i)*20*(j-1),d.crownY+oy*.9+Math.cos(t*.7+i)*14*(j-1),t,i)});
+  }
+
+  /* ------------------------------------------------------------ loop */
+  let dirty=true,visible=true;
+  function kick(){dirty=true;if(paused)render(0)}
+  function render(dt){X.setTransform(1,0,0,1,0,0);X.globalAlpha=1;frame(dt);dirty=false}
+  setInterval(()=>{
+    const now=performance.now(),dt=Math.min(.1,(now-last)/1000);last=now;
+    if(document.hidden||!visible) return;
+    if(paused){if(dirty)render(0);return}
+    clock+=dt;render(dt);
+  },33);
+  new IntersectionObserver(es=>{visible=es[0].isIntersecting}).observe(cv);
+  const btn=$("#stage-pause");
+  const label=()=>{btn.textContent=paused?"▶":"❚❚";btn.setAttribute("aria-label",paused?"Play the animation":"Pause the animation")};
+  btn.onclick=()=>{paused=!paused;try{localStorage.setItem("crinoid-stage-paused",paused?"1":"0")}catch(e){}label();kick()};
+  label();
+  // tests: advance the stage clock without waiting for the wall clock
+  return{sync,cue:play,get paused(){return paused},_step:sec=>{for(let i=0;i<Math.round(sec*30);i++){clock+=1/30;render(1/30)}}};
+})();
+
+const drawFig=()=>STAGE.sync();
 
 /* ----------------------------------------------------------------- hud */
 function hud(){
   const el=$("#hud");
-  if(!S||S.phase==="gone"){el.classList.add("hidden");return}
+  const place=()=>{$("#stage").style.top=(el.classList.contains("hidden")?0:el.offsetHeight)+"px"};
+  if(!S||S.phase==="gone"){el.classList.add("hidden");place();return}
   el.classList.remove("hidden");
   const bar=(v,m)=>"▮".repeat(Math.max(0,v))+"▯".repeat(Math.max(0,m-v));
   let x=`<span class="era">${S.era==="carb"?"CARBONIFEROUS":"PRESENT DAY"}</span>`;
@@ -222,10 +594,11 @@ function hud(){
     if(S.tenants.length||S.snail) x+=`<span>TENANTS <b>${S.tenants.length+(S.snail?1:0)}</b></span>`;
   }
   x+=`<span class="r">${got().length}/${ENDINGS.length} endings</span>`;
-  el.firstChild.innerHTML=x;
+  el.firstChild.innerHTML=x;place();
 }
 
 /* ------------------------------------------------------------- the log */
+const stickTop=()=>($("#hud").classList.contains("hidden")?0:$("#hud").offsetHeight)+$("#stage").offsetHeight+16;
 function say(html,cls="beat"){const d=document.createElement("div");d.className=cls;d.innerHTML=html;$("#log").appendChild(d);return d}
 function head(t){say(t,"head")}
 function stat(parts){say(parts.filter(Boolean).join(" &nbsp;·&nbsp; "),"stat")}
@@ -235,14 +608,14 @@ function choices(list){
     b.innerHTML=`<span class="lbl">${o.label}</span>${o.gloss?`<span class="gloss">${o.gloss}</span>`:""}`;
     b.onclick=()=>{c.innerHTML="";o.go();hud();drawFig();
       const last=$("#log").lastElementChild;
-      const y=(last?last.getBoundingClientRect().top+scrollY:0)-80;
+      const y=(last?last.getBoundingClientRect().top+scrollY:0)-stickTop();
       if(o.scroll!==false) scrollTo({top:Math.max(0,y),behavior:"smooth"})};
     c.appendChild(b)});
 }
 
 /* ------------------------------------------------------------ title */
 function title(){
-  S=null;$("#game").classList.add("hidden");$("#title").classList.remove("hidden");hud();
+  S=null;$("#game").classList.add("hidden");$("#title").classList.remove("hidden");hud();STAGE.cue("title");
   const c=$("#choices-t");c.innerHTML="";
   [["carb","The Carboniferous","340 million years ago. The Age of Crinoids. Everyone you know is a crinoid."],
    ["now","The present day","Deep water. Most of your relatives have left. There are urchins."]].forEach(([e,l,g])=>{
@@ -263,7 +636,7 @@ function begin(era){
   head("Day 1 &nbsp;·&nbsp; the water column");
   say(`You are a <b>doliolaria</b>: a small barrel ringed with bands of cilia, smaller than a sesame seed. You cannot eat. You have no mouth yet. You were packed a lunch — yolk — and it will last a few days.`);
   say(`Your only job is to find something hard, and hold on to it for the rest of your life. That is the whole plan. Nobody has ever improved on it.`);
-  larva();hud();drawFig();
+  STAGE.cue("larva");larva();hud();drawFig();
 }
 
 /* ------------------------------------------------------------- larva */
@@ -285,7 +658,7 @@ function larva(){
 }
 function settle(){
   if(S.sub==="sand") return end("sand");
-  S.phase="sessile";S.season=1;
+  S.phase="sessile";S.season=1;STAGE.cue("settle");
   head("Settling");
   say(`You glue yourself down, stop swimming, and begin to turn into something else. The barrel goes. A stalk comes up, then a cup on top of it, then arms. This takes a while and you do not get a say in any of it.`);
   if(S.era==="carb") say(`When you can see again, you see crinoids. Thousands of them, in every direction the silt allows, arms open to the current: a meadow of animals pretending to be plants, on a warm shallow sea floor that will one day be Missouri. This is the Mississippian. The textbooks call it the Age of Crinoids. You are, briefly, the most normal thing in the world.`);
@@ -310,7 +683,8 @@ const FEED_LINES=[
   `You open the fan. Somewhere up the current a whole reef is having the worst day of its life, and it is delicious.`,
   `You open the fan and the sea does what the sea does, which is to go past you with things in it.`];
 function season(first){
-  const ev=first?"current":rollEvent(); S.ev=ev; S.open=false;
+  const ev=first?"current":rollEvent(); S.ev=ev; S.open=false; S.visitor=null;
+  if(!first) STAGE.cue("season");
   head(`Season ${S.season}`);
   if(ev==="current"){
     say(`The current is running. Particles are going past: plankton, detritus, bits of things. This is what you are for.`,"evt");
@@ -355,10 +729,10 @@ function season(first){
   else if(ev==="fish"){
     say(`A fish has noticed that one of your arms is edible.`,"evt");
     choices([
-      {label:"Let it have the arm",gloss:"arms −1",go:()=>{S.arms--;S.lost++;say(`You drop it at a joint built for dropping. The fish swims off with it, pleased. You have nine more of these, or had.`);stat([`<span class="dn">arms −1</span>`]);next()}},
+      {label:"Let it have the arm",gloss:"arms −1",go:()=>{STAGE.cue("fish-take");S.arms--;S.lost++;say(`You drop it at a joint built for dropping. The fish swims off with it, pleased. You have nine more of these, or had.`);stat([`<span class="dn">arms −1</span>`]);next()}},
       {label:"Pull it in",gloss:"costs food; may not work",go:()=>{S.food--;
-        if(chance(.5)){say(`You coil the arm down into the others. The fish loses interest. You spent a season's worth of effort not being eaten, which is a thing a lot of animals will recognise.`);stat([`<span class="dn">food −1</span>`])}
-        else{S.arms=Math.max(0,S.arms-3);S.lost+=3;say(`You pull. The fish pulls harder, and gets three.`);stat([`<span class="dn">food −1</span>`,`<span class="dn">arms −3</span>`])}
+        if(chance(.5)){STAGE.cue("fish-leave");say(`You coil the arm down into the others. The fish loses interest. You spent a season's worth of effort not being eaten, which is a thing a lot of animals will recognise.`);stat([`<span class="dn">food −1</span>`])}
+        else{STAGE.cue("fish-take");S.arms=Math.max(0,S.arms-3);S.lost+=3;say(`You pull. The fish pulls harder, and gets three.`);stat([`<span class="dn">food −1</span>`,`<span class="dn">arms −3</span>`])}
         next()}}]);
   }
   else if(ev==="urchin"){
@@ -366,26 +740,27 @@ function season(first){
     choices([
       {label:"Stay where you are",gloss:"it might not be hungry",warn:true,go:()=>{
         if(chance(.6)) return end("eaten");
-        S.stalk=Math.max(3,S.stalk-4);say(`It reaches you, rasps at the bottom of your stalk for a while, and wanders off. You are shorter than you were.`);stat([`<span class="dn">stalk −4</span>`]);next()}},
+        STAGE.cue("urchin-leave");S.stalk=Math.max(3,S.stalk-4);say(`It reaches you, rasps at the bottom of your stalk for a while, and wanders off. You are shorter than you were.`);stat([`<span class="dn">stalk −4</span>`]);next()}},
       {label:"Let go and crawl",gloss:"costs 1 food",go:()=>{
-        S.food-=1;S.crawled++;S.stalk=Math.max(3,S.stalk-3);
+        STAGE.cue("crawl");S.food-=1;S.crawled++;S.stalk=Math.max(3,S.stalk-3);
         say(`You let go of the sea floor, lie down, and pull yourself away across the mud with your arms, trailing the stalk behind you like a sensible handbag. Stalked crinoids really do this. Almost nobody knows. The urchin does, and you are faster than it.`);
         say(`You stop a few metres away, raise yourself, and hold on to something new.`);
         stat([`<span class="dn">food −1</span>`,`<span class="dn">stalk −3</span>`]);next()}}]);
   }
   else if(ev==="tenant"){
     if(S.era==="carb"){
+      S.visitor="snail";
       say(`A snail has arrived. It is a platyceratid, and it has climbed up your stalk and settled itself directly over your anus, facing in.`,"evt");
       choices(["Allow it","Object"].map((l,i)=>({label:l,gloss:i?"with what?":"",go:()=>{
-        S.snail=true;
+        S.snail=true;S.visitor=null;
         say(i?`You object. You have no brain, no voice, and no hands. The snail stays.`:`You allow it. It was not asking.`);
         say(`Platyceratids lived like this: parked for life on a crinoid's anal vent, eating what came out. They have been found fossilised in place, still on their crinoid. It will be with you until the end. It will cost you a little every meal.`);
         next()}})));
     } else {
       const T=pick([["shrimp","a crinoid shrimp, dressed in your exact colours"],["clingfish","a clingfish the length of a fingernail"],["worm","a myzostomid worm, a flat little parasite that lives on crinoids and nowhere else"],["lobster","a squat lobster, which is neither a lobster nor, really, squat"]]);
-      say(`Someone is moving in: ${T[1]}.`,"evt");
+      S.visitor=T[0];say(`Someone is moving in: ${T[1]}.`,"evt");
       choices(["Allow it","Object"].map((l,i)=>({label:l,gloss:i?"with what?":"",go:()=>{
-        S.tenants.push(T[0]);
+        S.tenants.push(T[0]);S.visitor=null;
         say(i?`You object. You have no brain, no voice, and no hands. It moves in.`:`You allow it. It was not asking.`);
         next()}})));
     }
@@ -450,6 +825,7 @@ const E={
 };
 function end(id){
   S.open=false; if(id==="feather"){S.feather=true}
+  STAGE.cue("end",id);
   const isNew=save(id);const t=ENDINGS.find(e=>e[0]===id)[1];
   if(["drift","sand"].includes(id)) S.phase="gone";
   const d=say(`<div class="cap">Ending ${ENDINGS.findIndex(e=>e[0]===id)+1} of ${ENDINGS.length}</div><h2>${t}</h2>${E[id]()}`+
@@ -464,7 +840,7 @@ function end(id){
     (isNew?`<div class="newend">new ending · ${got().length} of ${ENDINGS.length} found</div>`:""),"ending");
   hud();drawFig();
   choices([{label:"Be born again",gloss:"crinoids have been doing this for 480 million years",go:title,scroll:false}]);
-  setTimeout(()=>scrollTo({top:d.getBoundingClientRect().top+scrollY-80,behavior:"smooth"}),30);
+  setTimeout(()=>scrollTo({top:d.getBoundingClientRect().top+scrollY-stickTop(),behavior:"smooth"}),30);
 }
 /* ------------------------------------------------------------- trailer */
 (function(){
