@@ -1,0 +1,4 @@
+{
+  "Narrator": { "preset": "narrator", "tongue": 41, "pitch": 112, "range": 2, "lilt": 0, "rate": 0.95, "tilt": 0.42, "pauses": 1.3 },
+  "Urchin":   { "preset": "beast", "tongue": 41, "rate": 0.55, "fx": { "echo": 0.25 } }
+}

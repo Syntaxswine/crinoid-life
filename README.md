@@ -25,6 +25,20 @@ greyscale; OpenCV at 4–10px/module. A plain code is decoded first as the
 control. Under simulated phone capture (tilt, perspective, dim exposure,
 JPEG q40) ZXing read it 40/40.
 
+## Trailer
+
+**[Watch the trailer](https://github.com/Syntaxswine/crinoid-life/releases/tag/trailer-v1)** —
+73 s, vertical (1080×1920), made for a phone.
+
+The narrator speaks a consistent invented language, synthesised by
+[babble-lab](https://github.com/Syntaxswine/babble-lab), while the real words
+type out in the text box on the same schedule the voice speaks them. Every
+frame is drawn procedurally from one function of time (`video/trailer.html`).
+
+Rebuild: `cd video && npm install && node render.mjs` (needs babble-lab
+checked out beside this repo, Chrome, and `pip install imageio-ffmpeg`).
+`node stills.mjs 5 30 51` renders a contact sheet at those seconds.
+
 ## Files
 
 - `index.html` — the whole game, one self-contained file, no build.

@@ -1,0 +1,361 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Hold On — trailer</title>
+<style>
+  html,body{margin:0;background:#0b1011;color:#dde2dc;font:13px ui-monospace,Consolas,monospace}
+  #wrap{display:flex;flex-direction:column;align-items:center;gap:8px;padding:10px}
+  canvas{width:min(540px,94vw);height:auto;background:#000}
+  #bar{width:min(540px,94vw);display:flex;gap:8px;align-items:center}
+  #bar input{flex:1}
+  body.render #bar{display:none} body.render #wrap{padding:0}
+  body.render canvas{width:1080px}
+</style>
+</head>
+<body>
+<div id="wrap">
+  <canvas id="c" width="1080" height="1920"></canvas>
+  <div id="bar"><button id="play">play</button><input id="scrub" type="range" min="0" max="100" step="0.01" value="0"><span id="tt">0.0</span></div>
+</div>
+<script src="timeline.js"></script>
+<script>
+"use strict";
+// Every frame is a pure function of t (seconds). The renderer calls draw(t);
+// the scrubber below is only for looking at it in a browser.
+const C = document.getElementById("c"), X = C.getContext("2d");
+const W = 1080, H = 1920, FLOOR = 1330;
+const COL = {
+  bgTop: "#10191b", bgBot: "#070b0c", ink: "#dde2dc", ink2: "#8f9a95", rule: "#2f3a38",
+  rose: "#c77892", roseD: "#9a4a63", teal: "#77b3b8", stalk: "#8a8576", mud: "#4a3f33",
+  stone: "#b8ab93", stoneD: "#857a66", paper: "#1a2120"
+};
+const SERIF = '"Palatino Linotype","Book Antiqua",Palatino,Georgia,serif';
+const MONO = 'Consolas,ui-monospace,monospace';
+const TL = window.TL;
+const L = i => TL.lines[i].start, Le = i => TL.lines[i].start + TL.lines[i].dur;
+const clamp = (v, a = 0, b = 1) => Math.max(a, Math.min(b, v));
+const ramp = (t, a, b) => clamp((t - a) / (b - a));
+const ease = u => u * u * (3 - 2 * u);
+const lerp = (a, b, u) => a + (b - a) * u;
+const hash = n => { const s = Math.sin(n * 127.1 + 311.7) * 43758.5453; return s - Math.floor(s); };
+
+let QR = null;
+const qrImg = new Image(); qrImg.onload = () => { QR = qrImg; }; qrImg.src = "../qr-crinoid.png";
+
+/* ------------------------------------------------------------ backdrop */
+function water(t, drift) {
+  const g = X.createLinearGradient(0, 0, 0, H);
+  g.addColorStop(0, COL.bgTop); g.addColorStop(1, COL.bgBot);
+  X.fillStyle = g; X.fillRect(0, 0, W, H);
+  // marine snow: slow fall, or a sideways stream when the current runs
+  for (let k = 0; k < 140; k++) {
+    const sp = 20 + hash(k) * 40, sz = 1 + hash(k + 9) * 2.6;
+    let x = hash(k + 3) * W, y = hash(k + 5) * H;
+    y = (y + t * sp) % (FLOOR + 40);
+    x = ((x + t * drift * (0.6 + hash(k + 7))) % (W + 60) + W + 60) % (W + 60) - 30;
+    X.globalAlpha = 0.18 + hash(k + 11) * 0.3;
+    X.fillStyle = COL.ink;
+    if (drift > 60) { X.fillRect(x, y, sz * 5, sz * 0.8); } else { X.beginPath(); X.arc(x, y, sz, 0, 7); X.fill(); }
+  }
+  X.globalAlpha = 1;
+}
+function floor(y = FLOOR) {
+  X.fillStyle = "#0c1213"; X.fillRect(0, y, W, H - y);
+  X.strokeStyle = COL.rule; X.lineWidth = 2; X.beginPath(); X.moveTo(0, y); X.lineTo(W, y); X.stroke();
+  for (let k = 0; k < 40; k++) { X.fillStyle = "#1a2322"; X.beginPath(); X.ellipse(hash(k + 40) * W, y + 6 + hash(k + 41) * 30, 6 + hash(k) * 16, 3 + hash(k + 2) * 5, 0, 0, 7); X.fill(); }
+}
+function rock(x, y, w, h) {
+  X.fillStyle = "#28302f"; X.beginPath();
+  X.moveTo(x - w / 2, y); X.bezierCurveTo(x - w / 2, y - h, x - w * .1, y - h * 1.15, x + w * .15, y - h);
+  X.bezierCurveTo(x + w * .45, y - h * .9, x + w / 2, y - h * .4, x + w / 2, y); X.closePath(); X.fill();
+  X.strokeStyle = "#3a4442"; X.lineWidth = 3; X.stroke();
+}
+
+/* ------------------------------------------------------------ crinoid */
+// o = open 0..1; lie = 0 upright .. 1 lying crown-left; row = crawl phase
+function crinoid(p) {
+  const { x, y, stalk = 520, open = 1, t = 0, lie = 0, row = 0, s = 1, stone = false, arms = 10, alpha = 1, roots = true, grow = 1 } = p;
+  X.save(); X.globalAlpha = alpha; X.translate(x, y - lie * 38 * s); X.rotate(-lie * Math.PI / 2 * 0.94); X.scale(s, s);
+  const rose = stone ? COL.stoneD : COL.rose, roseD = stone ? "#6f6555" : COL.roseD, stk = stone ? "#9d917b" : COL.stalk;
+  const sway = (1 - lie) * Math.sin(t * 0.7) * 0.05;
+  const len = stalk * grow, tx = Math.sin(sway) * len, ty = -len;
+  // stalk
+  X.strokeStyle = stk; X.lineWidth = 16; X.lineCap = "round";
+  X.beginPath(); X.moveTo(0, 0); X.quadraticCurveTo(tx * 0.2, ty * 0.5, tx, ty); X.stroke();
+  X.strokeStyle = stone ? "#b9ad95" : "#0e1415"; X.lineWidth = 2;
+  for (let u = 0.03; u < 0.97; u += 16 / Math.max(len, 1)) {
+    const px = 2 * u * (1 - u) * tx * 0.2 + u * u * tx, py = 2 * u * (1 - u) * ty * 0.5 + u * u * ty;
+    X.beginPath(); X.moveTo(px - 8, py); X.lineTo(px + 8, py); X.stroke();
+  }
+  // cirri at nodals
+  X.strokeStyle = stk; X.lineWidth = 4;
+  for (let u = 0.2; u < 0.9; u += 0.22) {
+    if (u > grow) break;
+    const px = 2 * u * (1 - u) * tx * 0.2 + u * u * tx, py = 2 * u * (1 - u) * ty * 0.5 + u * u * ty;
+    for (const sd of [-1, 1]) { X.beginPath(); X.moveTo(px, py); X.quadraticCurveTo(px + sd * 40, py - 10, px + sd * 46, py + 22); X.stroke(); }
+  }
+  if (roots && lie < 0.5 && grow > 0.05) {
+    X.lineWidth = 7;
+    for (const sd of [-1, -.45, .45, 1]) { X.beginPath(); X.moveTo(0, -6); X.quadraticCurveTo(sd * 26, 4, sd * 60, 8); X.stroke(); }
+  }
+  if (grow < 0.35) { X.restore(); return; }
+  const crown = clamp((grow - 0.35) / 0.65);
+  // cup
+  X.save(); X.translate(tx, ty); X.rotate(sway * 1.5);
+  X.fillStyle = rose; X.beginPath(); X.moveTo(-34 * crown, 0); X.lineTo(34 * crown, 0); X.lineTo(48 * crown, -44 * crown); X.lineTo(-48 * crown, -44 * crown); X.closePath(); X.fill();
+  // arms
+  const n = arms, spread = lerp(0.35, 2.55, open);
+  for (let i = 0; i < n; i++) {
+    const u = n === 1 ? 0 : i / (n - 1) - 0.5;
+    const wob = Math.sin(t * 0.9 + i * 1.7) * 0.05 + (row ? Math.sin(row + i * 0.63) * 0.35 * (1 - open) : 0);
+    const a = u * spread + wob;
+    const Lr = (300 + (1 - Math.abs(u)) * 70) * crown;
+    const bx = u * 60 * crown, by = -40 * crown;
+    const cx = bx + Math.sin(a * 0.75) * Lr * 0.55, cy = by - Math.cos(a * 0.75) * Lr * 0.55;
+    const curl = lerp(1.1, 0.25, open);
+    const ex = bx + Math.sin(a) * Lr, ey = by - Math.cos(a) * Lr;
+    const kx = ex - Math.sin(a) * 60 * curl + Math.cos(a) * -u * 90 * curl, ky = ey + Math.cos(a) * 60 * curl + Math.sin(a) * -u * 90 * curl;
+    const pts = [];
+    for (let k = 0; k <= 40; k++) { const v = k / 40; pts.push([(1 - v) ** 2 * bx + 2 * v * (1 - v) * cx + v * v * ex, (1 - v) ** 2 * by + 2 * v * (1 - v) * cy + v * v * ey]); }
+    for (let k = 1; k <= 12; k++) { const v = k / 12; pts.push([(1 - v) ** 2 * ex + 2 * v * (1 - v) * (ex + (ex - cx) * 0.3) + v * v * kx, (1 - v) ** 2 * ey + 2 * v * (1 - v) * (ey + (ey - cy) * 0.3) + v * v * ky]); }
+    // pinnules first so the arm sits on top
+    X.strokeStyle = roseD; X.lineWidth = 3;
+    for (let k = 2; k < pts.length - 2; k += 2) {
+      const [x0, y0] = pts[k - 1], [x1, y1] = pts[k + 1], [px, py] = pts[k];
+      const dl = Math.hypot(x1 - x0, y1 - y0) || 1, nx = -(y1 - y0) / dl, ny = (x1 - x0) / dl, fx = (x1 - x0) / dl, fy = (y1 - y0) / dl;
+      const pl = 30 * (1 - k / pts.length * 0.6) * (0.35 + 0.65 * open);
+      for (const sd of [-1, 1]) { X.beginPath(); X.moveTo(px, py); X.lineTo(px + sd * nx * pl + fx * pl * 0.7, py + sd * ny * pl + fy * pl * 0.7); X.stroke(); }
+    }
+    X.strokeStyle = rose; X.lineWidth = 9; X.lineJoin = "round";
+    X.beginPath(); X.moveTo(pts[0][0], pts[0][1]); for (const q of pts) X.lineTo(q[0], q[1]); X.stroke();
+  }
+  X.restore(); X.restore();
+  return { topX: x + tx * s, topY: y + ty * s };
+}
+
+function larva(x, y, t, a = 1) {
+  X.save(); X.globalAlpha = a; X.translate(x, y); X.rotate(Math.sin(t * 1.3) * 0.12);
+  X.fillStyle = "#2a1f25"; X.strokeStyle = COL.rose; X.lineWidth = 5;
+  X.beginPath(); X.ellipse(0, 0, 70, 105, 0, 0, 7); X.fill(); X.stroke();
+  X.fillStyle = "#d9b45a"; X.globalAlpha = a * 0.85; X.beginPath(); X.ellipse(0, 12, 38, 48, 0, 0, 7); X.fill(); X.globalAlpha = a;
+  for (let b = -2; b <= 2; b++) {
+    const yy = b * 38, hw = Math.sqrt(Math.max(0, 1 - (yy / 105) ** 2)) * 70;
+    X.strokeStyle = COL.teal; X.lineWidth = 3;
+    X.beginPath(); X.moveTo(-hw, yy); X.lineTo(hw, yy); X.stroke();
+    for (let c = -hw; c <= hw; c += 10) { const ph = Math.sin(t * 14 + c * 0.3 + b); X.beginPath(); X.moveTo(c, yy); X.lineTo(c + ph * 6, yy - 12); X.stroke(); }
+  }
+  X.restore();
+}
+
+function urchin(x, y, t, s = 1) {
+  X.save(); X.translate(x, y + Math.sin(t * 2) * 3); X.scale(s, s);
+  X.strokeStyle = "#b9a37a"; X.lineCap = "round";
+  for (let k = 0; k < 13; k++) {  // primary spines: few, long, thick (cidaroid)
+    const a = -Math.PI * 0.95 + k / 12 * Math.PI * 1.9 + Math.sin(t * 1.3 + k) * 0.04;
+    X.lineWidth = 11; X.beginPath(); X.moveTo(Math.cos(a) * 70, Math.sin(a) * 60); X.lineTo(Math.cos(a) * 190, Math.sin(a) * 175); X.stroke();
+    X.fillStyle = "#b9a37a"; X.beginPath(); X.arc(Math.cos(a) * 190, Math.sin(a) * 175, 7, 0, 7); X.fill();
+  }
+  X.fillStyle = "#6d3b3b"; X.beginPath(); X.ellipse(0, 0, 90, 76, 0, 0, 7); X.fill();
+  X.fillStyle = "#8d5454";
+  for (let r = 0; r < 5; r++) for (let k = 0; k < 9; k++) { const a = k / 9 * 7 + r; X.beginPath(); X.arc(Math.cos(a) * r * 16, Math.sin(a) * r * 13, 5, 0, 7); X.fill(); }
+  X.restore();
+}
+
+function starfish(x, y, r, a) {
+  X.save(); X.globalAlpha = a; X.translate(x, y); X.rotate(0.3);
+  X.fillStyle = "#c98a4a"; X.beginPath();
+  for (let k = 0; k < 10; k++) { const rr = k % 2 ? r * 0.42 : r, an = k / 10 * Math.PI * 2 - Math.PI / 2; X.lineTo(Math.cos(an) * rr, Math.sin(an) * rr); }
+  X.closePath(); X.fill(); X.restore();
+}
+
+/* ------------------------------------------------------------ type */
+function label(text, x, y, tx, ty, a) {
+  if (a <= 0) return;
+  X.save(); X.globalAlpha = a;
+  X.strokeStyle = COL.ink2; X.lineWidth = 2; X.setLineDash([6, 6]);
+  X.beginPath(); X.moveTo(x, y); X.lineTo(tx, ty); X.stroke(); X.setLineDash([]);
+  X.fillStyle = COL.ink; X.beginPath(); X.arc(tx, ty, 6, 0, 7); X.fill();
+  X.font = `600 34px ${MONO}`; X.fillStyle = COL.teal; X.textAlign = x < tx ? "right" : "left"; X.textBaseline = "middle";
+  X.fillText(text, x + (x < tx ? -12 : 12), y);
+  X.restore();
+}
+function hud(text, a = 1) {
+  if (!text || a <= 0) return;
+  X.save(); X.globalAlpha = a;
+  X.fillStyle = "#0e1312"; X.fillRect(0, 0, W, 92);
+  X.fillStyle = COL.rule; X.fillRect(0, 92, W, 2);
+  X.font = `28px ${MONO}`; X.textBaseline = "middle"; X.textAlign = "left";
+  let x = 44;
+  for (const [s, c] of text) { X.fillStyle = c || COL.ink2; X.fillText(s, x, 48); x += X.measureText(s).width + 26; }
+  X.restore();
+}
+const bar = (v, m) => "▮".repeat(v) + "▯".repeat(m - v);
+
+function wrap(text, maxW) {
+  const words = text.split(" "), lines = [];
+  let cur = "", start = 0, idx = 0;
+  for (const w of words) {
+    const tryS = cur ? cur + " " + w : w;
+    if (X.measureText(tryS).width > maxW && cur) { lines.push([cur, start]); start = idx; cur = w; } else cur = tryS;
+    idx += w.length + 1;
+  }
+  lines.push([cur, start]); return lines;
+}
+function dialogue(t) {
+  let line = null;
+  for (const l of TL.lines) if (t >= l.start - 0.15 && t <= l.start + l.dur + 0.9) line = l;
+  if (!line) return;
+  const a = Math.min(ramp(t, line.start - 0.15, line.start + 0.05), 1 - ramp(t, line.start + line.dur + 0.6, line.start + line.dur + 0.9));
+  let n = 0; for (const [tt, k] of line.reveal) if (t - line.start >= tt) n = k;
+  if (t > line.start + line.dur) n = line.text.length;
+  const bx = 54, by = 1440, bw = W - 108, bh = 330;
+  X.save(); X.globalAlpha = a;
+  X.fillStyle = "rgba(14,19,18,0.94)"; X.fillRect(bx, by, bw, bh);
+  X.strokeStyle = COL.roseD; X.lineWidth = 3; X.strokeRect(bx, by, bw, bh);
+  X.font = `600 28px ${MONO}`; X.fillStyle = COL.rose; X.textBaseline = "top";
+  X.fillText(line.who.toUpperCase(), bx + 36, by + 28);
+  X.font = `50px ${SERIF}`; X.fillStyle = COL.ink;
+  const lines = wrap(line.text, bw - 72);
+  lines.forEach(([s, st], i) => { const vis = s.slice(0, Math.max(0, n - st)); X.fillText(vis, bx + 36, by + 84 + i * 64); });
+  if (n >= line.text.length && Math.floor(t * 2.5) % 2 === 0) { X.fillStyle = COL.rose; X.beginPath(); X.moveTo(bx + bw - 50, by + bh - 44); X.lineTo(bx + bw - 30, by + bh - 44); X.lineTo(bx + bw - 40, by + bh - 30); X.fill(); }
+  X.restore();
+}
+
+/* ------------------------------------------------------------ scenes */
+function draw(t) {
+  X.setTransform(1, 0, 0, 1, 0, 0); X.globalAlpha = 1;
+  const endT = TL.total;
+  const tB = L(0) - 0.4, tC = L(2) - 0.5, tD = L(3) + 1.0, tE = L(5) - 0.4, tF = L(7) - 0.5, tG = Le(10) + 0.6, tH = L(12) - 0.4;
+
+  if (t < tE) {                                   // A..D: quiet water
+    water(t, 0); floor();
+  } else if (t < tG) {
+    water(t, t < tF ? 260 : 30); floor();
+  } else if (t < tH) {
+    water(t, 0);
+  } else { X.fillStyle = COL.bgBot; X.fillRect(0, 0, W, H); }
+
+  if (t < tB) {                                   // A title
+    const a = ramp(t, 0.3, 1.3) * (1 - ramp(t, tB - 0.6, tB));
+    crinoid({ x: 540, y: FLOOR, t, open: 0.15, alpha: 0.18 * a + 0.0001 });
+    X.save(); X.globalAlpha = a; X.textAlign = "center"; X.fillStyle = COL.ink;
+    X.font = `84px ${MONO}`; X.letterSpacing = "18px"; X.fillText("HOLD ON", 549, 700);
+    X.letterSpacing = "0px"; X.font = `italic 44px ${SERIF}`; X.fillStyle = COL.ink2;
+    X.fillText("the life of a crinoid", 540, 780); X.restore();
+  } else if (t < tC) {                            // B the animal
+    const o = ease(ramp(t, L(0), L(0) + 3));
+    crinoid({ x: 540, y: FLOOR, t, open: o, alpha: ramp(t, tB, tB + 0.6) });
+    const sa = ramp(t, L(1) + 2.2, L(1) + 2.8) * (1 - ramp(t, tC - 0.4, tC));
+    starfish(860, FLOOR - 40, 64, sa);
+    label("COUSIN", 800, 1150, 850, FLOOR - 90, sa);
+    const la = ramp(t, L(1) + 0.9, L(1) + 1.4) * (1 - ramp(t, L(1) + 2.0, L(1) + 2.4));
+    X.save(); X.globalAlpha = la; X.font = `600 40px ${MONO}`; X.fillStyle = COL.bad || "#d1776c"; X.textAlign = "center";
+    X.fillStyle = "#d1776c"; X.fillText("NOT A LILY", 540, 300); X.restore();
+    hud([["PRESENT DAY", COL.rose], ["SEASON 1/10"], ["ARMS " + 10]], ramp(t, tB, tB + 0.6));
+  } else if (t < tD) {                            // C larva
+    const u = ramp(t, tC, tD);
+    rock(540, FLOOR, 360, 120);
+    larva(540 + Math.sin(t * 0.9) * 90, lerp(420, 760, u), t, ramp(t, tC, tC + 0.5));
+    label("LUNCH", 830, 560, 560 + Math.sin(t * 0.9) * 90, lerp(420, 760, u) + 10, ramp(t, L(2) + 2.3, L(2) + 2.8));
+    const day = 1 + Math.floor(u * 2.99);
+    hud([["LARVA", COL.rose], [`DAY ${day}/3`], ["YOLK " + bar(4 - day, 3)]]);
+  } else if (t < tE) {                            // D settle and grow
+    rock(540, FLOOR, 360, 120);
+    const sink = ease(ramp(t, tD, tD + 1.4));
+    const g = ease(ramp(t, tD + 1.4, L(4) + 1.2));
+    if (g < 0.02) larva(540, lerp(760, FLOOR - 185, sink), t, 1);
+    crinoid({ x: 540, y: FLOOR - 118, t, stalk: 440, grow: g, open: 0.2 * g, alpha: g > 0.02 ? 1 : 0 });
+    hud([["SETTLED", COL.rose], ["SEASON 1/10"], ["FOOD " + bar(5, 10)]]);
+  } else if (t < tF) {                            // E feeding: mouth and anus
+    rock(540, FLOOR, 360, 120);
+    const o = lerp(0.2, 1, ease(ramp(t, tE, tE + 1.6)));
+    const top = crinoid({ x: 540, y: FLOOR - 118, t, stalk: 440, open: o });
+    const mA = ramp(t, L(5) + 0.4, L(5) + 0.8), aA = ramp(t, L(5) + 2.0, L(5) + 2.4);
+    label("MOUTH", 250, 520, top.topX - 6, top.topY - 44, mA * (1 - ramp(t, tF - 0.5, tF)));
+    label("ANUS", 830, 520, top.topX + 16, top.topY - 44, aA * (1 - ramp(t, tF - 0.5, tF)));
+    const yrs = Math.floor(480e6 * ease(ramp(t, L(6) + 2.2, Le(6))));
+    if (t > L(6) + 2.0) { X.save(); X.globalAlpha = ramp(t, L(6) + 2.0, L(6) + 2.3) * (1 - ramp(t, tF - 0.4, tF)); X.font = `600 64px ${MONO}`; X.textAlign = "center"; X.fillStyle = COL.teal; X.fillText(yrs.toLocaleString("en-US"), 540, 250); X.font = `30px ${MONO}`; X.fillStyle = COL.ink2; X.fillText("YEARS OF PEACE", 540, 300); X.restore(); }
+    const food = Math.min(10, 5 + Math.floor(ramp(t, tE, tF) * 5));
+    hud([["CURRENT RUNNING", COL.teal], ["FOOD " + bar(food, 10)], ["ARMS 10"]]);
+  } else if (t < tG) {                            // F urchin and the crawl
+    const lieU = ease(ramp(t, L(9) + 0.2, L(9) + 1.2));
+    // it lets go, tips over clear of the rock (base swings right, the crown
+    // leads left), and rows itself away with its arms
+    const crawl = Math.max(0, t - (L(9) + 1.2));
+    rock(540, FLOOR, 360, 120);
+    crinoid({ x: lerp(540, 780, lieU) - crawl * 55, y: lerp(FLOOR - 118, FLOOR - 10, lieU), t, stalk: 440, s: lerp(1, 0.72, lieU),
+      open: lerp(1, 0.25, lieU), lie: lieU, row: lieU >= 1 ? t * 3.2 : 0, roots: lieU < 0.3 });
+    let ux = lerp(1320, 800, ease(ramp(t, tF, L(8))));
+    ux = lerp(ux, 1010, ease(ramp(t, L(9), L(9) + 1.2)));
+    ux -= crawl * 40;
+    urchin(ux, FLOOR - 170, t);
+    const u8 = ramp(t, L(8) - 0.1, L(8) + 0.3) * (1 - ramp(t, Le(8) + 0.4, Le(8) + 0.8));
+    label("CIDAROID", 700, 900, ux - 20, FLOOR - 230, ramp(t, L(7) + 1.2, L(7) + 1.8) * (1 - ramp(t, L(8), L(8) + 0.3)));
+    if (u8 > 0) { X.save(); X.globalAlpha = u8; X.font = `600 44px ${MONO}`; X.fillStyle = COL.ink; X.textAlign = "center"; X.fillText("!", ux, FLOOR - 400); X.restore(); }
+    hud(lieU > 0 ? [["WALKING AWAY", COL.rose], ["STALK 6 columnals"], ["FOOD " + bar(8, 10)]] : [["PRESENT DAY", COL.rose], ["URCHIN", "#d1776c"], ["ARMS 10"]]);
+  } else if (t < tH) {                            // G mud, then the drawer
+    const slab = ease(ramp(t, tG + 2.4, tG + 3.2));
+    if (slab < 1) {
+      floor(); const mud = ease(ramp(t, tG + 0.4, tG + 2.4));
+      [[180, 0.6], [370, 0.8], [560, 1], [760, 0.7], [930, 0.55]].forEach(([mx, sc], k) =>
+        crinoid({ x: mx, y: FLOOR, t: t + k, stalk: 420, open: 0.35, s: sc }));
+      // the water clouds, sediment rains, and the floor rises over the meadow
+      X.fillStyle = `rgba(74,63,51,${0.55 * ease(ramp(t, tG, tG + 1.2))})`; X.fillRect(0, 0, W, H);
+      for (let k = 0; k < 160; k++) {
+        const y = (hash(k + 70) * H + (t - tG) * (500 + hash(k) * 500)) % H;
+        X.fillStyle = "rgba(120,100,78,0.55)"; X.fillRect(hash(k + 71) * W, y, 3, 18 + hash(k + 72) * 30);
+      }
+      const top = lerp(FLOOR + 20, FLOOR - 640, mud);
+      X.fillStyle = COL.mud; X.beginPath(); X.moveTo(0, H);
+      for (let x = 0; x <= W; x += 30) X.lineTo(x, top + Math.sin(x * 0.02 + t * 2) * 14);
+      X.lineTo(W, H); X.closePath(); X.fill();
+      for (let k = 0; k < 7; k++) { const yy = top + 60 + k * 85; if (yy < H) { X.fillStyle = k % 2 ? "#54473a" : "#40362b"; X.fillRect(0, yy, W, 22); } }
+      hud([["CARBONIFEROUS", COL.rose], ["STORM", "#d1776c"], ["340,000,000 YEARS AGO"]]);
+    }
+    if (slab > 0) {
+      X.save(); X.globalAlpha = slab;
+      X.fillStyle = COL.stone; X.fillRect(0, 0, W, H);
+      for (let k = 0; k < 900; k++) { X.fillStyle = hash(k) > 0.5 ? "#a99c84" : "#c6baa3"; X.fillRect(hash(k + 1) * W, hash(k + 2) * H, 2 + hash(k + 3) * 6, 2 + hash(k + 4) * 4); }
+      X.save(); X.translate(560, 1180); X.rotate(-0.35);
+      crinoid({ x: 0, y: 0, t: 0, stalk: 470, open: 0.35, stone: true, roots: false, s: 1.05 });
+      X.restore();
+      X.fillStyle = "#efe9da"; X.fillRect(560, 1250, 450, 150);
+      X.strokeStyle = "#7a6f5c"; X.lineWidth = 2; X.strokeRect(560, 1250, 450, 150);
+      X.fillStyle = "#2a2622"; X.font = `600 30px ${MONO}`; X.fillText("CRINOIDEA", 584, 1296);
+      X.font = `24px ${MONO}`; X.fillText("Mississippian · complete", 584, 1336); X.fillText("Crawfordsville, Indiana", 584, 1370);
+      X.restore();
+    }
+  } else {                                        // H end card
+    const a = ramp(t, tH, tH + 0.6);
+    X.save(); X.globalAlpha = a; X.textAlign = "center";
+    X.font = `96px ${MONO}`; X.fillStyle = COL.ink; X.letterSpacing = "20px"; X.fillText("HOLD ON", 550, 260);
+    X.letterSpacing = "0px"; X.font = `italic 46px ${SERIF}`; X.fillStyle = COL.ink2; X.fillText("the life of a crinoid", 540, 340);
+    const b = ramp(t, Le(12) + 0.3, Le(12) + 0.9);
+    X.globalAlpha = a * b;
+    if (QR) { const qw = 720, qh = qw * QR.height / QR.width; X.fillStyle = "#eeece4"; X.fillRect(540 - qw / 2 - 20, 420 - 20, qw + 40, qh + 40); X.drawImage(QR, 540 - qw / 2, 420, qw, qh); }
+    X.font = `34px ${MONO}`; X.fillStyle = COL.teal; X.fillText("syntaxswine.github.io/crinoid-life", 540, 1250);
+    X.font = `30px ${MONO}`; X.fillStyle = COL.ink2; X.fillText("11 endings · free · plays in a browser", 540, 1310);
+    X.restore();
+  }
+  dialogue(t);
+  // fade in / out of the whole film
+  const f = Math.min(ramp(t, 0, 0.6), 1 - ramp(t, endT - 0.8, endT));
+  if (f < 1) { X.fillStyle = `rgba(0,0,0,${1 - f})`; X.fillRect(0, 0, W, H); }
+}
+window.draw = draw;
+window.ready = () => new Promise(r => { const k = () => (QR || qrImg.complete) && document.fonts.ready.then(r) || setTimeout(k, 50); k(); });
+
+/* ------------------------------------------------------------ preview */
+if (!location.search.includes("render")) {
+  const sc = document.getElementById("scrub"), tt = document.getElementById("tt"), pb = document.getElementById("play");
+  sc.max = TL.total; let playing = false, t0 = 0, s0 = 0;
+  const show = t => { draw(t); tt.textContent = t.toFixed(1); };
+  sc.oninput = () => { playing = false; show(+sc.value); };
+  pb.onclick = () => { playing = !playing; t0 = performance.now(); s0 = +sc.value; };
+  setInterval(() => { if (!playing) return; const t = s0 + (performance.now() - t0) / 1000; if (t > TL.total) playing = false; sc.value = t; show(t); }, 33);
+  qrImg.addEventListener("load", () => show(+sc.value)); show(0);
+} else document.body.classList.add("render");
+</script>
+</body>
+</html>
