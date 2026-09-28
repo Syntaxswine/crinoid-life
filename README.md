@@ -13,11 +13,23 @@ storms, urchins, fish, and tenants. Eleven endings, remembered in your browser.
 Same voice as [Twenty-One Pages](https://syntaxswine.github.io/cheesecake-cyoa/):
 deadpan, second person, and every fact is real.
 
+<p align="center"><img src="qr-crinoid.png" width="360" alt="A QR code for this repo, drawn as a crinoid: the code is the crown, ten arms fan up through it, and a stalk of columnals runs down to a holdfast."></p>
+
+The QR code above scans to this repo. It is a sea lily: ten arms rise from
+the cup and pass *through* the code as a tint that keeps every module's
+light/dark value (dark modules turn deep rose, light modules pale rose), so
+the bits are unchanged; version 5, error correction H. `tools/make_qr.py`
+rebuilds it and refuses to write a pass unless two independent decoders
+read it back: ZXing at every size down to 3px/module, blurred, and in
+greyscale; OpenCV at 4–10px/module. A plain code is decoded first as the
+control. Under simulated phone capture (tilt, perspective, dim exposure,
+JPEG q40) ZXing read it 40/40.
+
 ## Files
 
 - `index.html` — the whole game, one self-contained file, no build.
-- `qr-crinoid.svg` / `qr-crinoid.png` — a scannable QR code to this repo,
-  drawn as a crinoid.
+- `qr-crinoid.svg` / `qr-crinoid.png` — the QR code (SVG for print, PNG at 20px/module).
+- `tools/make_qr.py` — builds and decode-checks it (`pip install segno pillow opencv-python-headless zxing-cpp`).
 
 ## The facts
 
