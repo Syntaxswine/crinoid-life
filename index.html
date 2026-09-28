@@ -100,6 +100,19 @@ body{background:var(--paper);color:var(--ink);font-family:var(--serif);
 .newend{color:var(--good);font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;margin:1.2em 0 0}
 footer{margin-top:4em;padding-top:1.2em;border-top:1px solid var(--rule);font-family:var(--mono);
   font-size:10.5px;color:var(--ink-2);line-height:1.8}
+.trailer-btn{display:inline-flex;align-items:center;gap:.7em;margin:0 0 2em;padding:.7em 1.3em;
+  background:none;border:1px solid var(--accent);color:var(--accent);cursor:pointer;
+  font-family:var(--mono);font-size:12px;letter-spacing:.18em;text-transform:uppercase}
+.trailer-btn:hover,.trailer-btn:focus-visible{background:var(--accent);color:var(--paper);outline:none}
+.trailer-btn .tri{width:0;height:0;border-left:9px solid currentColor;border-top:6px solid transparent;border-bottom:6px solid transparent}
+.trailer-btn .len{opacity:.7;letter-spacing:.06em}
+#trailer{padding:0;border:0;background:transparent;max-width:none;max-height:none}
+#trailer::backdrop{background:rgba(5,8,8,.88)}
+#trailer .box{position:relative;display:flex;flex-direction:column;align-items:center;gap:10px}
+#trailer video{display:block;height:min(84vh,calc(92vw * 16 / 9));width:auto;max-width:92vw;background:#000}
+#trailer .close{font-family:var(--mono);font-size:12px;letter-spacing:.16em;text-transform:uppercase;
+  background:none;border:1px solid #8f9a95;color:#dde2dc;padding:.55em 1.2em;cursor:pointer}
+#trailer .close:hover{border-color:#dde2dc}
 .hidden{display:none !important}
 @media(max-width:520px){body{font-size:16px} #hud .in{font-size:10px;gap:3px 11px} #hud .r{margin-left:0}}
 </style>
@@ -110,6 +123,7 @@ footer{margin-top:4em;padding-top:1.2em;border-top:1px solid var(--rule);font-fa
   <section id="title">
     <h1>HOLD ON</h1>
     <p class="sub">the life of a crinoid, in ten seasons or fewer</p>
+    <button class="trailer-btn" id="trailer-open"><span class="tri"></span>Watch the trailer<span class="len">1:13</span></button>
     <div class="blurb">
       <p>You are a <b>crinoid</b>. The name means <i>lily-shaped</i>. You are not a lily.
       You are an animal, a cousin of the starfish, built out of a few thousand small
@@ -121,6 +135,14 @@ footer{margin-top:4em;padding-top:1.2em;border-top:1px solid var(--rule);font-fa
     <div id="choices-t"></div>
     <div id="gallery"></div>
   </section>
+  <dialog id="trailer" aria-label="Hold On trailer">
+    <div class="box">
+      <video id="trailer-v" controls playsinline preload="none" poster="trailer-poster.jpg">
+        <source src="trailer.mp4" type="video/mp4">
+      </video>
+      <button class="close" id="trailer-close">Close</button>
+    </div>
+  </dialog>
   <section id="game" class="hidden">
     <svg id="fig" viewBox="0 0 150 190" aria-hidden="true"></svg>
     <div id="log"></div>
@@ -444,6 +466,16 @@ function end(id){
   choices([{label:"Be born again",gloss:"crinoids have been doing this for 480 million years",go:title,scroll:false}]);
   setTimeout(()=>scrollTo({top:d.getBoundingClientRect().top+scrollY-80,behavior:"smooth"}),30);
 }
+/* ------------------------------------------------------------- trailer */
+(function(){
+  const d=$("#trailer"),v=$("#trailer-v");
+  const stop=()=>{v.pause()};
+  $("#trailer-open").onclick=()=>{d.showModal();v.play().catch(()=>{})};
+  const shut=()=>{stop();d.close()};              // pause now; "close" arrives a task later
+  $("#trailer-close").onclick=shut;
+  d.addEventListener("close",stop);                // Esc
+  d.addEventListener("click",e=>{if(e.target===d)shut()});
+})();
 title();
 </script>
 </body>

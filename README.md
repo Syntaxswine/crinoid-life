@@ -27,7 +27,7 @@ JPEG q40) ZXing read it 40/40.
 
 ## Trailer
 
-**[Watch the trailer](https://github.com/Syntaxswine/crinoid-life/releases/tag/trailer-v1)** —
+**Watch the trailer** on the game's title screen, or [download it](https://github.com/Syntaxswine/crinoid-life/releases/tag/trailer-v1) —
 73 s, vertical (1080×1920), made for a phone.
 
 The narrator speaks a consistent invented language, synthesised by
