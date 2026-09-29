@@ -13,7 +13,7 @@ for (const [name, vp] of [['phone', { width: 390, height: 844 }], ['desk', { wid
   for (const id of IDS) {
     await p.evaluate(id => { document.querySelector('.wrap').style.visibility = 'hidden';
       document.querySelector('#choices-t .choice').click(); document.querySelector('#choices .choice').click();
-      S.tenants = ['shrimp']; S.snail = true; STAGE.sync(); STAGE._step(2); STAGE.cue('end', id); STAGE._step(id === 'eaten' ? 5 : 6); }, id);
+      S.tenants = ['brittle', 'eulimid', 'worm', 'lobster']; S.snail = true; STAGE.sync(); STAGE._step(2); STAGE.cue('end', id); STAGE._step(id === 'eaten' ? 5 : 6); }, id);
     await p.screenshot({ path: path.join(HERE, `out/ends/${name}-${id}.jpg`), quality: 70 });
     await p.goto(pathToFileURL(path.join(HERE, '../index.html')).href);
   }

@@ -123,7 +123,7 @@ footer{margin-top:4em;padding-top:1.2em;border-top:1px solid var(--rule);font-fa
     <button class="trailer-btn" id="trailer-open"><span class="tri"></span>Watch the trailer<span class="len">1:13</span></button>
     <div class="blurb">
       <p>You are a <b>crinoid</b>. The name means <i>lily-shaped</i>. You are not a lily.
-      You are an animal, a cousin of the starfish, built out of a few thousand small
+      You are an animal, a cousin of the starfish, built out of tens of thousands of small
       plates of calcite, each one a single crystal.</p>
       <p>Your family has been doing this since the Ordovician. The job has not changed.
       You hold on to something. You open your arms. You wait for the sea to bring dinner.</p>
@@ -145,9 +145,10 @@ footer{margin-top:4em;padding-top:1.2em;border-top:1px solid var(--rule);font-fa
     <div id="choices"></div>
   </section>
   <footer>Facts are real; the crinoid is composite. Sources: the usual echinoderm literature —
-  Baumiller &amp; Messing on crawling and cidaroid predation, the platyceratid snail record,
-  Crawfordsville and the Burlington Limestone, Lindisfarne folklore, and the Missouri
-  state statutes. Some crinoid behaviour is compressed for play; no crinoid gets to choose its geological period.</footer>
+  Baumiller &amp; Messing on crawling and cidaroid predation, Gahn &amp; Baumiller on the
+  platyceratid snails, Nakano's sea-lily larvae, Crawfordsville and the Burlington Limestone,
+  the Missouri State Capitol, Lindisfarne folklore, and two state legislatures. Some crinoid
+  behaviour is compressed for play; no crinoid gets to choose its geological period.</footer>
 </div>
 <script>
 "use strict";
@@ -158,7 +159,7 @@ const chance=p=>Math.random()<p;
 const ENDINGS=[
  ["drift","NEVER SETTLED"],["sand","WRONG FLOOR"],["starved","SAFE THE WHOLE TIME"],
  ["cup","A CUP ON A STICK"],["eaten","DATA POINT"],["feather","FEATHER STAR"],
- ["landlord","LANDLORD"],["apart","A FEW THOUSAND PIECES"],["drawer","THE DRAWER"],
+ ["landlord","LANDLORD"],["apart","TENS OF THOUSANDS OF PIECES"],["drawer","THE DRAWER"],
  ["limestone","THE LOBBY FLOOR"],["beads","ST CUTHBERT'S BEADS"]];
 const KEY="crinoid-endings-v1";
 function got(){try{return JSON.parse(localStorage.getItem(KEY)||"[]")}catch(e){return []}}
@@ -321,10 +322,12 @@ const STAGE=(()=>{
   }
   function tenant(kind,x,y,t,k){
     X.save();X.translate(x+Math.sin(t*1.7+k)*4,y+Math.cos(t*1.3+k*2)*3);X.scale(1.9,1.9);
-    if(kind==="shrimp"){X.strokeStyle="#d58da2";X.lineWidth=7;X.lineCap="round";X.beginPath();X.arc(0,0,12,Math.PI*.9,Math.PI*2.1);X.stroke();
-      X.lineWidth=1.3;X.beginPath();X.moveTo(12,-2);X.quadraticCurveTo(30,-18,40,-10);X.moveTo(12,0);X.quadraticCurveTo(30,-8,42,2);X.stroke()}
-    else if(kind==="clingfish"){X.fillStyle="#d8c060";X.beginPath();X.ellipse(0,0,15,7,0,0,7);X.fill();
-      X.beginPath();X.moveTo(-13,0);X.lineTo(-24,-7);X.lineTo(-24,7);X.fill();X.fillStyle="#1a1a1a";X.beginPath();X.arc(8,-2,2,0,7);X.fill()}
+    if(kind==="brittle"){X.strokeStyle="#c9a98f";X.lineCap="round";X.lineWidth=2.6;X.beginPath();   // five snaking arms off a small disc
+      for(let a=0;a<5;a++){const b=a/5*6.283-1.57;let px=Math.cos(b)*4,py=Math.sin(b)*4;X.moveTo(px,py);
+        for(let s=1;s<=6;s++){const w=Math.sin(t*1.4+a*1.3+s*.9)*.35+(s*.12);px+=Math.cos(b+w)*3.8;py+=Math.sin(b+w)*3.8;X.lineTo(px,py)}}X.stroke();
+      X.fillStyle="#b8917a";X.beginPath();X.arc(0,0,5.5,0,7);X.fill()}
+    else if(kind==="eulimid"){X.rotate(.5);X.fillStyle="#efeae0";X.beginPath();X.moveTo(0,-19);X.lineTo(7,9);X.quadraticCurveTo(0,15,-7,9);X.closePath();X.fill();   // slender white spire
+      X.strokeStyle="#b9b2a4";X.lineWidth=1.2;X.beginPath();for(let k=0;k<5;k++){const y=-12+k*5,hw=2+k*1.2;X.moveTo(-hw,y+1.5);X.lineTo(hw,y-1.5)}X.stroke()}
     else if(kind==="worm"){X.fillStyle="#e0d6c8";X.beginPath();for(let a=0;a<6.3;a+=.35){const r=11+Math.sin(a*9)*2;X.lineTo(Math.cos(a)*r*1.3,Math.sin(a)*r)}X.fill()}
     else if(kind==="lobster"){X.fillStyle="#d9763a";X.beginPath();X.ellipse(0,0,13,9,0,0,7);X.fill();
       X.strokeStyle="#d9763a";X.lineWidth=3;X.beginPath();X.moveTo(10,-3);X.lineTo(34,-14);X.moveTo(10,3);X.lineTo(34,10);X.stroke();
@@ -360,7 +363,7 @@ const STAGE=(()=>{
     const sx=((t*120)%(W+900))-450;const gr=X.createLinearGradient(sx,0,sx+400,H);
     gr.addColorStop(0,"rgba(255,255,255,0)");gr.addColorStop(.5,"rgba(255,255,255,0.18)");gr.addColorStop(1,"rgba(255,255,255,0)");
     X.fillStyle=gr;X.fillRect(0,VT,W,H-VT);
-    X.fillStyle="rgba(30,26,22,.75)";X.font=`22px ${MONO}`;X.fillText("BURLINGTON LIMESTONE · POLISHED",24,H-24);
+    X.fillStyle="rgba(30,26,22,.75)";X.font=`22px ${MONO}`;X.fillText("CRINOIDAL LIMESTONE · POLISHED",24,H-24);
     X.restore();
   }
   function beach(a,t){
@@ -657,7 +660,7 @@ function larva(){
     {label:"Keep drifting",gloss:S.day>=3?"the yolk is nearly gone":"there might be somewhere better",warn:S.day>=3,go:()=>{
       if(S.day>=3) return end("drift");
       S.day++;head(`Day ${S.day} &nbsp;·&nbsp; still the water column`);
-      say(pick(["You drift. A copepod goes past, very busy. You feel the yolk get smaller.","You drift. The light gets dimmer and then brighter again. That was a night.","You drift. You are carried, as all plans are, somewhere slightly sideways of where you meant."]));
+      say(pick([S.era==="carb"?"You drift. A conodont goes past, very busy. For over a century, science will know it only by its teeth.":"You drift. A copepod goes past, very busy. You feel the yolk get smaller.","You drift. The light gets dimmer and then brighter again. That was a night.","You drift. You are carried, as all plans are, somewhere slightly sideways of where you meant."]));
       larva()}}]);
 }
 function settle(){
@@ -665,8 +668,8 @@ function settle(){
   S.phase="sessile";S.season=1;STAGE.cue("settle");
   head("Settling");
   say(`You glue yourself down, stop swimming, and begin to turn into something else. The barrel goes. A stalk comes up, then a cup on top of it, then arms. This takes a while and you do not get a say in any of it.`);
-  if(S.era==="carb") say(`When you can see again, you see crinoids. Thousands of them, in every direction the silt allows, arms open to the current: a meadow of animals pretending to be plants, on a warm shallow sea floor that will one day be Missouri. This is the Mississippian. The textbooks call it the Age of Crinoids. You are, briefly, the most normal thing in the world.`);
-  else say(`When you can see again, it is dark and cold and you are a hundred-odd metres down. There are not many of you. Most living crinoids are feather stars — they drop the stalk when they are young and walk off. The ones that stayed on stalks mostly live deep, and nobody is completely sure why. The leading theory is that things kept eating them.`);
+  if(S.era==="carb") say(`You have no eyes, which is a shame, because the view is crinoids. Thousands of them, in every direction the silt allows, arms open to the current: a meadow of animals pretending to be plants, on a warm, shallow sea floor near the equator. This is the Mississippian. The textbooks call it the Age of Crinoids. You are, briefly, the most normal thing in the world.`);
+  else say(`You have no eyes, and down here they would not help: it is dark and cold and you are a few hundred metres down. There are not many of you. Most living crinoids are feather stars — they start out on a stalk like yours, drop it while they are young, and walk off. The ones that kept their stalks mostly live deep, and nobody is completely sure why. The leading theory is that things kept eating them.`);
   season(true);
 }
 
@@ -681,11 +684,16 @@ function rollEvent(){
   if(r<.42) return "current"; if(r<.58) return "slack"; if(r<.74) return "fish";
   if(r<.86) return "urchin"; return "tenant";
 }
-const FEED_LINES=[
-  `You spread your arms into a fan across the current. Tube feet flick particles into the grooves along each arm; the grooves carry them, in mucus, down to your mouth. Your mouth is on top. So is your anus, a few millimetres away, on a little chimney. You have made your peace with this. You had four hundred and eighty million years.`,
-  `You open the fan. Diatoms, larvae, fragments of things that died upstream. It all goes down the grooves. You do not choose any of it. You are a very old kind of net.`,
+// era-aware: at 340 Ma the family is 140 My old, and diatoms are 200 My in the future
+const FEED_LINES=()=>[
+  `You spread your arms into a fan across the current. Tube feet flick particles into the grooves along each arm; the grooves carry them, in mucus, down to your mouth. Your mouth is on top. So is your anus, a few millimetres away, on a little chimney. You have made your peace with this. ${S.era==="carb"?"You have had a hundred and forty million years.":"You had four hundred and eighty million years."}`,
+  `You open the fan. ${S.era==="carb"?"Tiny algae":"Diatoms"}, larvae, fragments of things that died upstream. It all goes down the grooves. You do not choose any of it. You are a very old kind of net.`,
   `You open the fan. Somewhere up the current a whole reef is having the worst day of its life, and it is delicious.`,
   `You open the fan and the sea does what the sea does, which is to go past you with things in it.`];
+// Only a juvenile can drop the stalk and become a feather star: every comatulid passes through a
+// stalked (pentacrinoid) stage and detaches young. An adult sea lily can crawl, but never swims.
+const young=()=>S.era==="now"&&S.season<=3;
+const LET_GO={label:"Let go of the stalk",gloss:"only while you are young · you cannot take this back",warn:true,go:()=>end("feather")};
 function season(first){
   const ev=first?"current":rollEvent(); S.ev=ev; S.open=false; S.visitor=null;
   if(!first) STAGE.cue("season");
@@ -695,7 +703,7 @@ function season(first){
     choices([
       {label:"Open the fan",gloss:S.era==="now"?"eat; something with fins may notice":"eat",go:()=>{
         S.open=true;let g=Math.ceil(4*S.arms/10)+(S.era==="carb"&&S.stalk>=36?1:0)-(S.snail?1:0);
-        say(S.firstFeed?FEED_LINES[0]:pick(FEED_LINES.slice(1)));S.firstFeed=false;
+        say(S.firstFeed?FEED_LINES()[0]:pick(FEED_LINES().slice(1)));S.firstFeed=false;
         if(S.era==="carb"&&S.stalk>=36) say(`You are taller than most of the meadow now. The water up here is faster and nobody else has touched it.`);
         if(S.snail) say(`The snail on your anus takes its cut.`);
         let lost=0;
@@ -705,16 +713,16 @@ function season(first){
       {label:"Stay closed",gloss:"nothing can get you in here",go:()=>{
         S.closedStreak++;
         say(S.closedStreak>1?`You stay closed again. The current goes by, full. It will be back. Probably.`:`You keep your arms curled up over the cup. The food goes past. It is very safe in here and there is nothing to eat.`);
-        next()}}]);
+        next()}}].concat(young()?[LET_GO]:[]));
   }
   else if(ev==="slack"){
     say(`Slack water. Nothing is moving. Nothing is coming.`,"evt");
-    const c=[{label:"Wait",go:()=>{say(pick([`You wait. You are good at this. You have no brain, only a ring of nerves, and it is not troubled.`,`You wait. A worm crosses the floor below you. Neither of you makes anything of it.`,`You wait. Waiting is most of the job. The job is mostly waiting.`]));next()}}];
+    const c=[{label:"Wait",go:()=>{say(pick([`You wait. You are good at this. You have no brain — a ring of nerves round your mouth, a knot of them in your cup — and none of it is troubled.`,`You wait. A worm crosses the floor below you. Neither of you makes anything of it.`,`You wait. Waiting is most of the job. The job is mostly waiting.`]));next()}}];
     if(S.arms<10) c.push({label:"Regrow an arm",gloss:"costs 2 food",go:()=>{
       S.food-=2;S.arms++;S.regrown++;say(`You grow the arm back. Crinoids do this as a matter of routine; a lot of fossil arms show the join where a new one started. It costs you, but it is the same arm, more or less.`);stat([`<span class="dn">food −2</span>`,`<span class="up">arms +1</span>`]);next()}});
     if(S.era==="carb") c.push({label:"Add to the stalk",gloss:"costs 2 food · taller reaches faster water",go:()=>{
       S.food-=2;S.stalk+=10;say(`You add ten more columnals to the stalk: ten more discs of calcite, each with a hole through the middle, stacked like coins. The meadow has layers — short crinoids near the mud, tall ones above — and every layer eats different water.`);stat([`<span class="dn">food −2</span>`,`<span class="up">stalk +10</span>`]);next()}});
-    if(S.era==="now") c.push({label:"Let go of the stalk",gloss:"you cannot take this back",warn:true,go:()=>end("feather")});
+    if(young()) c.push(LET_GO);
     choices(c);
   }
   else if(ev==="storm"){
@@ -758,10 +766,11 @@ function season(first){
       choices(["Allow it","Object"].map((l,i)=>({label:l,gloss:i?"with what?":"",go:()=>{
         S.snail=true;S.visitor=null;
         say(i?`You object. You have no brain, no voice, and no hands. The snail stays.`:`You allow it. It was not asking.`);
-        say(`Platyceratids lived like this: parked for life on a crinoid's anal vent, eating what came out. They have been found fossilised in place, still on their crinoid. It will be with you until the end. It will cost you a little every meal.`);
+        say(`Platyceratids lived like this: parked for life on a crinoid's anal vent. They have been found fossilised in place, still on their crinoid. For a long time everyone assumed they ate what came out. Then somebody measured the crinoids: the ones with a snail were smaller. It was probably reaching in and taking your dinner before you had finished with it. It will be with you until the end.`);
         next()}})));
     } else {
-      const T=pick([["shrimp","a crinoid shrimp, dressed in your exact colours"],["clingfish","a clingfish the length of a fingernail"],["worm","a myzostomid worm, a flat little parasite that lives on crinoids and nowhere else"],["lobster","a squat lobster, which is neither a lobster nor, really, squat"]]);
+      // tenants recorded on deep stalked crinoids; the crinoid shrimps and clingfish live on shallow-reef feather stars
+      const T=pick([["brittle","a brittle star, which has wound itself in among your arms and plans to stay"],["eulimid","a eulimid, a slender white snail from a family that lives on echinoderms and nowhere else"],["worm","a myzostomid worm, a flat little parasite, dressed in your exact colours; nine in ten of its kind live on crinoids"],["lobster","a squat lobster, which is neither a lobster nor, really, squat"]]);
       S.visitor=T[0];say(`Someone is moving in: ${T[1]}.`,"evt");
       choices(["Allow it","Object"].map((l,i)=>({label:l,gloss:i?"with what?":"",go:()=>{
         S.tenants.push(T[0]);S.visitor=null;
@@ -789,7 +798,7 @@ function oldAge(){
 
 /* -------------------------------------------------------------- endings */
 function list(a){return a.length<2?a.join(""):a.slice(0,-1).join(", ")+" and "+a[a.length-1]}
-const TEN={shrimp:"a shrimp",clingfish:"a clingfish",worm:"a myzostomid worm",lobster:"a squat lobster"};
+const TEN={brittle:"a brittle star",eulimid:"a eulimid snail",worm:"a myzostomid worm",lobster:"a squat lobster"};
 const E={
  drift:()=>`<p>The yolk runs out on the fourth day. You never found anything you were sure enough about.</p>
   <p>You go on drifting, smaller than a sesame seed, and then you are simply part of the current — which is to say, part of the food. Somewhere downstream, a crinoid who settled on the first rock it saw opens its fan.</p>
@@ -807,20 +816,22 @@ const E={
   <p>Cidaroid urchins have been eating stalked crinoids for a very long time; fossil stalks carry what look like their bite marks going back to the Triassic. The usual defence is to get up and crawl away. You did not.</p>
   <p><em>This is the leading theory for why your family lives so deep now. You are a data point.</em></p>`,
  feather:()=>`<p>You let go. It is a clean break, at a joint that was made for it.</p>
-  <p>You grow cirri — small hooked feet — and you walk. When you want to, you swim, beating your arms in alternating sets, half up and half down, like someone badly remembering a dance. You climb a sea fan and open up at the top. Nothing about the food has changed. Everything about the address has.</p>
-  <p>Of the six hundred or so crinoid species alive today, most are feather stars. They all did this.</p>
+  <p>It turns out you were never a sea lily. You were a feather star all along: every one of them starts life on a stalk, looking exactly like you did, and drops it young.</p>
+  <p>You already have cirri — small hooked feet — and you walk off on them. When you want to, you swim, beating your arms in alternating sets, half up and half down, like someone badly remembering a dance. You climb a sea fan and open up at the top. Nothing about the food has changed. Everything about the address has.</p>
+  <p>Of the six or seven hundred crinoid species alive today, all but about a hundred are feather stars. They all did this.</p>
   <p><em>The oldest trick in the family is holding on. The most successful one turned out to be letting go.</em></p>`,
- landlord:()=>`<p>By the end, ${S.tenants.length} other animals live on you: ${list(S.tenants.map(t=>TEN[t]))}. None of them pay. Some of them are the same colour as you, on purpose.</p>
-  <p>Crinoids host shrimp, clingfish, squat lobsters, brittle stars, and myzostomid worms; some of those tenants live nowhere else. When you die they will have to move out, and it will be the most dramatic thing that has ever happened to them.</p>
+ landlord:()=>`<p>By the end, ${S.tenants.length} other animals live on you: ${list(S.tenants.map(t=>TEN[t]))}. None of them pay.${S.tenants.includes("worm")?" The worm is the same colour as you, on purpose.":""}</p>
+  <p>Crinoids are landlords to shrimp, clingfish, squat lobsters, brittle stars, snails and myzostomid worms, the shallow-water ones most of all, and some of those tenants live nowhere else. When you die they will have to move out, and it will be the most dramatic thing that has ever happened to them.</p>
   <p><em>You never did anything. You were just there, for long enough, and it became a neighbourhood.</em></p>`,
  apart:()=>`<p>You die in the ordinary way.</p>
-  <p>Within days, the soft tissue holding your plates together is gone, and you come apart into a few thousand pieces — each one a single crystal of calcite. The current you spent your whole life facing sorts you into the sand.</p>
+  <p>Within days, the soft tissue holding your plates together is gone, and you come apart into tens of thousands of pieces — each one a single crystal of calcite. The current you spent your whole life facing sorts you into the sand.</p>
   <p><em>Nobody will ever find you. That is how almost everyone goes.</em></p>`,
- drawer:()=>`<p>The storm drops the sea floor on top of you. A metre of mud in an afternoon. You, the crinoid beside you, and a thousand others are sealed in at once, arms still curled, every plate still where you put it.</p>
-  <p>Three hundred and forty million years later somebody splits a slab of rock in Crawfordsville, Indiana, and there you are, whole. You go into a drawer, in a museum, with a label. Missouri made the crinoid its state fossil in 1989. You were not consulted.</p>
+ drawer:()=>`<p>The storm drops the sea floor on top of you: silt washed off a river delta nearby, all of it in an afternoon. You, the crinoid beside you, and a thousand others are sealed in at once, arms still curled, every plate still where you put it.</p>
+  <p>Three hundred and forty million years later somebody splits a slab of rock in Crawfordsville, Indiana, and there you are, whole. You go into a drawer, in a museum, with a label; Crawfordsville crinoids are in museum drawers all over the world. Bills to make the crinoid Indiana's state fossil went nowhere. In 2022 Indiana chose the mastodon. You were not consulted.</p>
   <p><em>Almost every perfect fossil is a disaster that happened fast. The sea only keeps what it buries in a hurry.</em></p>`,
- limestone:()=>`<p>You die in the ordinary way. Within days you come apart into a few thousand plates, and the plates settle among the plates of everyone else who ever lived in the meadow.</p>
-  <p>Pile up enough of that and it gets a name: crinoidal limestone. The Burlington Limestone, across Missouri, Iowa and Illinois, is largely made of crinoids like you. Some of it gets cut, polished, and laid in the lobby of a building, where people stand in line on top of you and look at their phones.</p>
+ limestone:()=>`<p>You die in the ordinary way. Within days you come apart into tens of thousands of plates, and the plates settle among the plates of everyone else who ever lived in the meadow.</p>
+  <p>Pile up enough of that and it gets a name: crinoidal limestone. The Burlington Limestone, across Missouri, Iowa and Illinois, is largely made of crinoids like you. In Missouri, stone like it was quarried, polished, and sold as marble. It is not marble. It lines the walls and floors of the State Capitol, where people stand in line on top of you and look at their phones.</p>
+  <p>Missouri made the crinoid its state fossil in 1989, because some schoolchildren from Lee's Summit asked. You were not consulted.</p>
   ${S.snail?"<p>The snail is in there too. It stayed to the end. It never once looked up.</p>":""}
   <p><em>You were never going to be a fossil. You were going to be the floor.</em></p>`,
  beads:()=>`<p>You were tall: ${S.stalk} columnals, each a small disc of calcite with a hole through the middle. When you come apart, they scatter.</p>

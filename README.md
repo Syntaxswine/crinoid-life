@@ -5,7 +5,7 @@
 **Play:** https://syntaxswine.github.io/crinoid-life/
 
 A short choose-your-own-adventure. You are a crinoid — a sea lily, which is an
-animal, a cousin of the starfish, built from a few thousand plates of calcite.
+animal, a cousin of the starfish, built from tens of thousands of plates of calcite.
 Choose an era (the Carboniferous meadow, or the present-day deep), find
 something hard to hold on to as a larva, and live ten seasons of feeding,
 storms, urchins, fish, and tenants. Eleven endings, remembered in your browser.
@@ -47,12 +47,34 @@ checked out beside this repo, Chrome, and `pip install imageio-ffmpeg`).
 
 ## The facts
 
-Real: mouth and anus both on the upper surface; non-feeding yolky larvae;
-stalked crinoids crawling away from cidaroid urchins; platyceratid snails
-fossilised in place on crinoid anal vents; each plate a single calcite crystal;
-crinoidal limestone (the Burlington, across Missouri, Iowa and Illinois);
-Crawfordsville, Indiana; St Cuthbert's beads on Lindisfarne; the crinoid as
-Missouri's state fossil (1989); feather stars as most of the living species.
+Real: mouth and anus both on the upper surface; non-feeding yolky larvae
+(sea lilies too: Nakano et al. 2003); stalked crinoids crawling away from
+cidaroid urchins at 10-30 mm/s (Baumiller & Messing 2007), and cidaroid bite
+marks back to the Triassic (Baumiller et al. 2010); platyceratid snails
+fossilised in place on crinoid anal vents, and infested crinoids growing
+smaller (Gahn & Baumiller 2003); each plate a single calcite crystal;
+crinoidal limestone (the Burlington, across Missouri, Iowa and Illinois), and
+Missouri limestone polished and sold as "marble" for the State Capitol
+(Missouri DNR); Crawfordsville, Indiana, buried by storm-driven silt off a
+delta; St Cuthbert's beads on Lindisfarne and the anvil legend (1783, and
+Scott's *Marmion*); the crinoid as Missouri's state fossil (1989), and
+Indiana's mastodon (2022); about 95 stalked species among six or seven hundred.
+
+Corrected in a fact-check (2026-09-29):
+
+| Was | Now | Why |
+|---|---|---|
+| "a few thousand" plates | tens of thousands | counting brachials and pinnulars, the arms alone of a small ten-armed feather star hold ~15,000; published estimates put most crinoids above 200,000 |
+| diatoms in the Carboniferous | tiny algae | the oldest diatoms are ~200 My younger |
+| "you had 480 million years", at 340 Ma | 140 million | the family started ~480 Ma |
+| a copepod passes the Carboniferous larva | a conodont | the oldest copepod fossils are ~303 Ma |
+| the Carboniferous meadow "will one day be Missouri" | "near the equator" | the endings put you in Indiana and Northumberland |
+| any adult sea lily can become a feather star | only in seasons 1-3 | feather stars drop the stalk as juveniles; an adult sea lily crawls but never swims |
+| crinoid shrimp and clingfish on a deep sea lily | brittle star, eulimid snail | those two live on shallow-reef feather stars (8-25 m) |
+| myzostomids live "on crinoids and nowhere else" | nine in ten do | about ten species live on starfish and brittle stars |
+| "When you can see again" | "You have no eyes" | crinoids have none |
+| "a hundred-odd metres down" | a few hundred | 100-150 m is the shallowest extreme |
+| "a metre of mud" | storm silt off a delta | no source for the thickness; the delta is Crawfordsville's |
 
 Compressed for play: season lengths, odds, and the choice of era. No crinoid
 gets to choose its geological period.
